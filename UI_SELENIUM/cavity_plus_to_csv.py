@@ -1,3 +1,4 @@
+import csv
 import os
 import configparser
 from selenium import webdriver
@@ -60,7 +61,7 @@ def upload_and_submit_pdb(driver, pdb_file_path, pdb_input):
         print(f"An error occurred during upload and submit: {e}")
         raise
 
-def write_cavity_results(driver, pdb_file_name_no_extension):
+def write_cavity_results(driver, pdb_name, output_dir="output"):
     try:
         # Wait for the Cavity Results table to be present
         table_locator = (By.CSS_SELECTOR, "div.accordion-collapse.show table.table")
@@ -81,10 +82,69 @@ def write_cavity_results(driver, pdb_file_name_no_extension):
         driver.execute_script("arguments[0].click();", more_button)
         print("Successfully clicked the More button in the first row")
 
+        # Locate the Surface Area and Volume elements
+        surface_area_locator = (By.XPATH, "//th[contains(text(), 'Surface Area')]/parent::tr/td")
+        volume_locator = (By.XPATH, "//th[contains(text(), 'Volume')]/parent::tr/td")
+
+        surface_area_td = WebDriverWait(driver, 10).until(
+            EC.presence_of_element_located(surface_area_locator)
+        )
+        volume_td = WebDriverWait(driver, 10).until(
+            EC.presence_of_element_located(volume_locator)
+        )
+
+        # Locate the Residues element
+        residues_locator = (By.XPATH, "//th[contains(text(), 'Residues')]/parent::tr/td")
+        residues_td = WebDriverWait(driver, 10).until(
+            EC.presence_of_element_located(residues_locator)
+        )
+
+        # Extract the text from the Residues element
+        residues_text = residues_td.text
+
+        # Split the residues text by commas into a list
+        residues_list = [residue.strip() for residue in residues_text.split(',') if residue.strip()]
+
+        print(f"Residues: {residues_list}")
+
+        # Extract the text values
+        surface_area = surface_area_td.text
+        volume = volume_td.text
+
+        print(f"Surface Area: {surface_area}, Volume: {volume}")
+        # Create the output subfolder if it doesn't exist
+        output_path = os.path.join(os.getcwd(), output_dir)
+        os.makedirs(output_dir, exist_ok=True)
+
+        # Create and write to the CSV file
+        csv_filename = os.path.join(output_path,f"{pdb_name}_cvpl_va.csv")
+        with open(csv_filename, mode='w', newline='', encoding='utf-8') as csvfile:
+            writer = csv.writer(csvfile)
+            writer.writerow(['Cavity Number', 'Surface Area', 'Volume'])
+            writer.writerow([1, surface_area, volume])
+
+        print(f"Successfully wrote results to {csv_filename}")
+
+
+        # Write residues to a CSV file in the output subfolder
+        residues_csv_filename = os.path.join(output_path,
+                                             f"{pdb_name}_cvpl_residues.csv")
+        with open(residues_csv_filename, mode='w', newline='', encoding='utf-8') as csvfile:
+            writer = csv.writer(csvfile)
+            writer.writerow(['Chain', 'Seq ID', 'AA'])
+            for residue in residues_list:
+                parts = residue.split('-')
+                assert len(parts) == 3, f"Unexpected residue format: {residue}"
+                aa, seq_id, chain = parts
+                writer.writerow([chain, seq_id, aa])
+
+        print(f"Successfully wrote residues to {residues_csv_filename}")
+
+
     except Exception as e:
         print(f"An error occurred while writing cavity results: {e}")
         raise
-
+#filenames pdb_name_cvpl_va.csv, pdb_name_cvpl_res.csv
 
 
 def run_cavity_plus():
@@ -93,11 +153,12 @@ def run_cavity_plus():
     chrome_driver_path = config['chrome_driver_path']
     cavity_plus_url = config['cavity_plus_url']
     input_dir = config['input_dir']
+    output_dir = config['output_dir']
     pdb_input = config['pdb_input']
+    pdb_name=os.path.splitext(pdb_input)[0]
 
     # Construct the full path to the PDB file
     pdb_file_path = os.path.abspath(os.path.join(input_dir, pdb_input))
-    pdb_file_name_no_extension = os.path.splitext(pdb_input)[0]
 
     # Set up Chrome options to automatically download files
     chrome_options = Options()
@@ -129,7 +190,7 @@ def run_cavity_plus():
         )
         print("Download results button is now visible and clickable")
 
-        write_cavity_results(driver, pdb_file_name_no_extension)
+        write_cavity_results(driver, pdb_name, output_dir)
 
     except Exception as e:
         print(f"An error occurred: {e}")
