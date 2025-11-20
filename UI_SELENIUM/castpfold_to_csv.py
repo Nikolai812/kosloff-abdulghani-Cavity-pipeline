@@ -221,7 +221,8 @@ def run_castpfold():
 
     # Set up Chrome options to automatically download files
     chrome_options = Options()
-    download_dir = r"C:\Windriver"
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    download_dir = os.path.join(script_dir, "output")
     prefs = {
         "download.default_directory": download_dir,
         "download.prompt_for_download": False,
