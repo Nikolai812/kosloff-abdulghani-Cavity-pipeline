@@ -1,7 +1,9 @@
 import configparser
 import csv
 import os
+import sys
 import time
+from configparser import ConfigParser, SectionProxy
 
 from selenium.webdriver.common.by import By
 from selenium import webdriver
@@ -9,6 +11,9 @@ from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+
+from castpfold_request import submit_castpfold_request
+from file_namer import FileNamer, MethodType
 
 
 def enter_text_in_input(driver, input_id, text):
@@ -40,7 +45,7 @@ def load_config():
     return config['DEFAULT']
 
 
-def write_pocket_info_csv(driver, csv_filename):
+def write_pocket_info_csv(driver, output_directory,pdb_name, pocket_limit):
     # Locate the table element
     table = driver.find_element(By.CSS_SELECTOR, "table")
 
@@ -53,7 +58,9 @@ def write_pocket_info_csv(driver, csv_filename):
 
     # Extract rows
     rows = []
-    for tr in table.find_elements(By.CSS_SELECTOR, "tbody tr"):
+    tr_elements = table.find_elements(By.CSS_SELECTOR, "tbody tr")
+    first_tr_elements = tr_elements[:pocket_limit]
+    for tr in first_tr_elements:
         row = []
         for td in tr.find_elements(By.TAG_NAME, "td"):
             if td.text.strip():  # Skip empty cells
@@ -63,19 +70,24 @@ def write_pocket_info_csv(driver, csv_filename):
             rows.append(row)
 
     # Write to CSV
-    os.makedirs(os.path.dirname(csv_filename), exist_ok=True)
-    with open(csv_filename, 'w', newline='', encoding='utf-8') as csvfile:
+    os.makedirs(f"{output_directory}/{pdb_name}", exist_ok=True)
+    cspf_va_filename=FileNamer.get_va_name(pdb_name, MethodType.CSPF) + ".csv"
+    with open(f"{output_directory}/{pdb_name}/{cspf_va_filename}", 'w', newline='', encoding='utf-8') as csvfile:
         writer = csv.writer(csvfile)
         writer.writerow(headers)
         writer.writerows(rows)
 
-    print(f"Data written to {csv_filename}")
+    print(f"Data written to {cspf_va_filename}")
 
-def open_atom_info_save_csv(driver, output_directory):
+def open_atom_info_save_csv(driver, output_directory, pdb_name, pocket_limit):
+    if pocket_limit > 10:
+        raise ValueError(f"Pocket limit cannot be greater than 10, however requested pocket_limit was set to {pocket_limit}")
+
     # Locate all rows in the table
     pocket_rows = driver.find_elements(By.XPATH, "//table[.//th/div[contains(text(), 'Pocket ID')]]/tbody[1]/tr[contains(@class, 'ant-table-row-level-0')]")
+    first_pocket_rows = pocket_rows[:pocket_limit]
 
-    for i, pocket_row in enumerate(pocket_rows):
+    for i, pocket_row in enumerate(first_pocket_rows):
         try:
             # Get pocket ID from the second column
             pocket_id = pocket_row.find_elements(By.TAG_NAME, "td")[1].text.strip()
@@ -144,7 +156,10 @@ def open_atom_info_save_csv(driver, output_directory):
                     ul_atom_pagination = pocket_row.find_elements(By.XPATH, "./following-sibling::tr[contains(@class, 'ant-table-expanded-row-level-1') and not(contains(@style, 'display: none'))]//ul[contains(@class, 'ant-pagination')]")
 
             # Write all data to CSV
-            with open(f"{output_directory}/pocket_{pocket_id}_atom_info.csv", 'w', newline='', encoding='utf-8') as csvfile:
+            residues_csv_file_name = FileNamer.get_residues_name(pdb_name, MethodType.CSPF)
+            #with open(f"{output_directory}/pocket_{pocket_id}_atom_info.csv", 'w', newline='', encoding='utf-8') as csvfile:
+            with open(f"{output_directory}/{pdb_name}/{residues_csv_file_name}_{pocket_id}.csv", 'w', newline='',
+                      encoding='utf-8') as csvfile:
                 writer = csv.writer(csvfile)
                 writer.writerow(headers)
                 writer.writerows(all_atom_rows)
@@ -169,7 +184,10 @@ def open_atom_info_save_csv(driver, output_directory):
             raise
 
 
-def iterate_pagination(driver, output_directory):
+def iterate_pagination(driver, output_directory, pdb_name: str, pocket_limit =1):
+    if pocket_limit > 10:
+        raise ValueError(f"Pocket limit cannot be greater than 10, however requested pocket_limit was set to {pocket_limit}")
+
     # Locate the pagination element
     pagination = driver.find_element(By.CSS_SELECTOR, "ul.ant-pagination")
 
@@ -181,7 +199,11 @@ def iterate_pagination(driver, output_directory):
     tab_count = int(last_tab.text)
     print(f"Total pagination tabs for all pockets: {tab_count}")
 
-    for i in range(1, tab_count + 1):
+    # In case of pocket limit < 10, only the first page tab should be treated
+    max_pagination_item=2
+    if(pocket_limit < 0):
+        max_pagination_item=tab_count+1
+    for i in range(1, max_pagination_item):
         # Wait for the current tab to be active
         WebDriverWait(driver, 10).until(
             EC.presence_of_element_located((By.CSS_SELECTOR, f"li.ant-pagination-item-{i}.ant-pagination-item-active"))
@@ -190,8 +212,8 @@ def iterate_pagination(driver, output_directory):
         # Print the current tab number
         print(f"Pagination tab {i} is displayed")
 
-        write_pocket_info_csv(driver, f"{output_directory}/tab_{i}_pockets.csv")
-        open_atom_info_save_csv(driver, output_directory)
+        write_pocket_info_csv(driver, output_directory, pdb_name, pocket_limit)
+        open_atom_info_save_csv(driver, output_directory, pdb_name, pocket_limit)
 
         # If not the last tab, click "Next Page"
         if i < tab_count:
@@ -207,17 +229,27 @@ def iterate_pagination(driver, output_directory):
     first_tab.click()
 
     # Print completion message
-    print(f"All {tab_count} tabs displayed")
+    print(f"All {max_pagination_item-1} tabs displayed since pocket limit is set: {pocket_limit}")
 
 
-def run_castpfold():
+def run_castpfold(pdb_file, config: SectionProxy):
     print("Starting CASTpFold script...")
     # Load config
-    config = load_config()
+    # config = load_config()
     chrome_driver_path = config['chrome_driver_path']
     base_url = config['base_url']
-    job_number = config['job_number']
-    output_directory = config['out_dir'] + '_' + job_number
+    #job_number = config['job_number']
+    output_directory = config['output_dir']
+    #config['out_dir']  + '_' + job_number
+    pocket_limit = int(config['pocket_limit'])
+    # To be requested from the input directory using pdb_name
+    print(f"CASTpFold request for a file: {pdb_file}")
+    input_dir = config['input_dir']
+    if not FileNamer.verify_pdb_exists(input_dir, pdb_file):
+        raise Exception(f"File {pdb_file} does not exist in the {input_dir}")
+    job_number = submit_castpfold_request(os.path.join(input_dir, pdb_file))
+    pdb_name = os.path.splitext(pdb_file)[0]
+    print(f"CASTpFold script initialized from config, pocket_limit: {pocket_limit}")
 
     # Set up Chrome options to automatically download files
     chrome_options = Options()
@@ -239,19 +271,17 @@ def run_castpfold():
         # Open the specified URL
         driver.get(f"{base_url}?{job_number}")
         time.sleep(1)
-        iterate_pagination(driver, output_directory=output_directory)
+        iterate_pagination(driver, output_directory=output_directory,pdb_name=pdb_name, pocket_limit=pocket_limit)
         time.sleep(1)
-    # write_pocket_info_csv(driver, f"{output_directory}/pocket_info.csv")
-    # open_atom_info_save_csv(driver, output_directory)
     except BaseException as e:
-        print("While running: ", e)
+        print(f"Error while running casfpfold  on {pdb_file}: ", e)
     finally:
-        print("this is finally, going to quit driver")
+        print("castpfold finally, going to quit driver")
         driver.quit()
-        print("after quit")
 
     print("CASTpFold script completed.")
 
 
 if __name__ == '__main__':
-    run_castpfold()
+    config = load_config()
+    run_castpfold("HsOR343CF_1", config)

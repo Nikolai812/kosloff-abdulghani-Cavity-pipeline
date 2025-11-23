@@ -1,6 +1,8 @@
 import csv
 import os
 import configparser
+from configparser import SectionProxy
+
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait, Select
@@ -8,6 +10,8 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
 import time
+
+from file_namer import FileNamer, MethodType
 
 def load_config():
     config = configparser.ConfigParser()
@@ -37,7 +41,7 @@ def upload_and_submit_pdb(driver, pdb_file_path, pdb_input):
         file_input.send_keys(pdb_file_path)
         success_div_locator = (By.XPATH,
                                "//input[@type='file' and @accept='pdb']/following-sibling::div[text()='Success.']")
-        submit_div = WebDriverWait(driver, 30).until(
+        submit_div = WebDriverWait(driver, 50).until(
             EC.element_to_be_clickable(success_div_locator)
         )
 
@@ -113,23 +117,22 @@ def write_cavity_results(driver, pdb_name, output_dir="output"):
 
         print(f"Surface Area: {surface_area}, Volume: {volume}")
         # Create the output subfolder if it doesn't exist
-        output_path = os.path.join(os.getcwd(), output_dir)
-        os.makedirs(output_dir, exist_ok=True)
+        output_path = os.path.join(os.getcwd(), output_dir, pdb_name)
+        os.makedirs(output_path, exist_ok=True)
 
         # Create and write to the CSV file
-        csv_filename = os.path.join(output_path,f"{pdb_name}_cvpl_va.csv")
-        with open(csv_filename, mode='w', newline='', encoding='utf-8') as csvfile:
+        va_csv_filename = FileNamer.get_va_name(pdb_name, MethodType.CVPL) + ".csv"
+        with open(os.path.join(output_path, va_csv_filename), mode='w', newline='', encoding='utf-8') as csvfile:
             writer = csv.writer(csvfile)
             writer.writerow(['Cavity Number', 'Surface Area', 'Volume'])
             writer.writerow([1, surface_area, volume])
 
-        print(f"Successfully wrote results to {csv_filename}")
+        print(f"Successfully wrote results to {va_csv_filename}")
 
 
         # Write residues to a CSV file in the output subfolder
-        residues_csv_filename = os.path.join(output_path,
-                                             f"{pdb_name}_cvpl_residues.csv")
-        with open(residues_csv_filename, mode='w', newline='', encoding='utf-8') as csvfile:
+        residues_csv_filename = FileNamer.get_residues_name(pdb_name, MethodType.CVPL) + ".csv"
+        with open(os.path.join(output_path, residues_csv_filename), mode='w', newline='', encoding='utf-8') as csvfile:
             writer = csv.writer(csvfile)
             writer.writerow(['Chain', 'Seq ID', 'AA'])
             for residue in residues_list:
@@ -147,14 +150,14 @@ def write_cavity_results(driver, pdb_name, output_dir="output"):
 #filenames pdb_name_cvpl_va.csv, pdb_name_cvpl_res.csv
 
 
-def run_cavity_plus():
+def run_cavity_plus(pdb_input: str, config: SectionProxy):
     # Extract configuration values
-    config = load_config()
+    #config = load_config()
     chrome_driver_path = config['chrome_driver_path']
     cavity_plus_url = config['cavity_plus_url']
     input_dir = config['input_dir']
     output_dir = config['output_dir']
-    pdb_input = config['pdb_input']
+    #pdb_input = config['pdb_input']
     pdb_name=os.path.splitext(pdb_input)[0]
 
     # Construct the full path to the PDB file
@@ -203,4 +206,10 @@ def run_cavity_plus():
     print("Cavity Plus script completed")
 
 if __name__ == '__main__':
-    run_cavity_plus()
+    config = load_config()
+    chrome_driver_path = config['chrome_driver_path']
+    cavity_plus_url = config['cavity_plus_url']
+    input_dir = config['input_dir']
+    output_dir = config['output_dir']
+    pdb_input = config['pdb_input']
+    run_cavity_plus(pdb_input, config)
