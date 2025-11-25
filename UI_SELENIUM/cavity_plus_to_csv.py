@@ -65,89 +65,133 @@ def upload_and_submit_pdb(driver, pdb_file_path, pdb_input):
         print(f"An error occurred during upload and submit: {e}")
         raise
 
-def write_cavity_results(driver, pdb_name, output_dir="output"):
+
+
+def write_cavity_results(driver, pdb_name, output_dir="output", pocket_limit= -1):
     try:
-        # Wait for the Cavity Results table to be present
+        # Wait for the Cavity Results table
         table_locator = (By.CSS_SELECTOR, "div.accordion-collapse.show table.table")
         table = WebDriverWait(driver, 30).until(
             EC.presence_of_element_located(table_locator)
         )
 
-        # Locate the More (3 dots) element in the first row
-        more_button_locator = (By.CSS_SELECTOR, "tbody tr:first-child td:last-child div[style*='color: blue']")
-        more_button = WebDriverWait(driver, 10).until(
-            EC.element_to_be_clickable(more_button_locator)
+        # Locate ALL top-level rows
+        rows = driver.find_elements(
+            By.XPATH,
+            "//button[.//b[normalize-space()='Download results']]"
+            "/ancestor::div[contains(@class,'container')]"
+            "//table[1]/tbody/tr[count(td)=7]"
         )
 
-        # Scroll the More button into view
-        driver.execute_script("arguments[0].scrollIntoView();", more_button)
+        total_rows = len(rows)
+        print(f"Found {total_rows} cavity rows.")
 
-        # Click the More button using JavaScript
-        driver.execute_script("arguments[0].click();", more_button)
-        print("Successfully clicked the More button in the first row")
+        # Apply pocket limit if specified
+        if pocket_limit > 0:
+            if pocket_limit > total_rows:
+                print(
+                    f"WARNING: pocket_limit={pocket_limit} exceeds total cavities ({total_rows}). "
+                    f"Processing all available cavities instead."
+                )
+                rows_to_process = rows  # safe
+            else:
+                print(f"Applying pocket limit: processing first {pocket_limit} cavities.")
+                rows_to_process = rows[:pocket_limit]  # always safe
+        else:
+            rows_to_process = rows
 
-        # Locate the Surface Area and Volume elements
-        surface_area_locator = (By.XPATH, "//th[contains(text(), 'Surface Area')]/parent::tr/td")
-        volume_locator = (By.XPATH, "//th[contains(text(), 'Volume')]/parent::tr/td")
+        # Iterate only over the selected row
 
-        surface_area_td = WebDriverWait(driver, 10).until(
-            EC.presence_of_element_located(surface_area_locator)
-        )
-        volume_td = WebDriverWait(driver, 10).until(
-            EC.presence_of_element_located(volume_locator)
-        )
-
-        # Locate the Residues element
-        residues_locator = (By.XPATH, "//th[contains(text(), 'Residues')]/parent::tr/td")
-        residues_td = WebDriverWait(driver, 10).until(
-            EC.presence_of_element_located(residues_locator)
-        )
-
-        # Extract the text from the Residues element
-        residues_text = residues_td.text
-
-        # Split the residues text by commas into a list
-        residues_list = [residue.strip() for residue in residues_text.split(',') if residue.strip()]
-
-        print(f"Residues: {residues_list}")
-
-        # Extract the text values
-        surface_area = surface_area_td.text
-        volume = volume_td.text
-
-        print(f"Surface Area: {surface_area}, Volume: {volume}")
-        # Create the output subfolder if it doesn't exist
+        # Create output subfolder
         output_path = os.path.join(os.getcwd(), output_dir, pdb_name)
         os.makedirs(output_path, exist_ok=True)
 
-        # Create and write to the CSV file
+        # File names
         va_csv_filename = FileNamer.get_va_name(pdb_name, MethodType.CVPL) + ".csv"
-        with open(os.path.join(output_path, va_csv_filename), mode='w', newline='', encoding='utf-8') as csvfile:
-            writer = csv.writer(csvfile)
-            writer.writerow(['Cavity Number', 'Surface Area', 'Volume'])
-            writer.writerow([1, surface_area, volume])
-
-        print(f"Successfully wrote results to {va_csv_filename}")
-
-
-        # Write residues to a CSV file in the output subfolder
         residues_csv_filename = FileNamer.get_residues_name(pdb_name, MethodType.CVPL) + ".csv"
-        with open(os.path.join(output_path, residues_csv_filename), mode='w', newline='', encoding='utf-8') as csvfile:
-            writer = csv.writer(csvfile)
-            writer.writerow(['Chain', 'Seq ID', 'AA'])
-            for residue in residues_list:
-                parts = residue.split('-')
-                assert len(parts) == 3, f"Unexpected residue format: {residue}"
-                aa, seq_id, chain = parts
-                writer.writerow([chain, seq_id, aa])
 
-        print(f"Successfully wrote residues to {residues_csv_filename}")
+        # Open CSVs
+        with open(os.path.join(output_path, va_csv_filename), 'w', newline='', encoding='utf-8') as va_file, \
+             open(os.path.join(output_path, residues_csv_filename), 'w', newline='', encoding='utf-8') as res_file:
 
+            va_writer = csv.writer(va_file)
+            res_writer = csv.writer(res_file)
+
+            # Headers
+            va_writer.writerow(['Cavity Number', 'Surface Area', 'Volume'])
+            res_writer.writerow(['Cavity Number', 'Chain', 'Seq ID', 'AA'])
+
+            # Iterate over actual row elements (stable)
+            for cavity_index, row in enumerate(rows_to_process, start=1):
+                print(f"\nProcessing cavity row {cavity_index}...")
+                cavity_number = row.find_element(By.XPATH, "./td[1]").text.strip()
+                if not cavity_number:
+                    raise RuntimeError(f"Could not read cavity number for row index {cavity_index}")
+
+                # --- CLICK MORE BUTTON INSIDE THIS ROW ---
+                more_button = row.find_element(
+                    By.CSS_SELECTOR,
+                    "td:last-child div[style*='color: blue']"
+                )
+
+                driver.execute_script("arguments[0].scrollIntoView();", more_button)
+                driver.execute_script("arguments[0].click();", more_button)
+                print(f"Expanded details for row {cavity_index}")
+
+                # Wait for the expanded detail <tr id='more_{cavity_number}'> to appear (and be visible)
+                detail_tr_id = f"more_{cavity_number}"
+                WebDriverWait(driver, 15).until(
+                    EC.presence_of_element_located((By.ID, detail_tr_id))
+                )
+                detail_tr = driver.find_element(By.ID, detail_tr_id)
+
+                # Optionally wait until it has class 'collapse show' or is displayed
+                WebDriverWait(driver, 10).until(
+                    lambda d: 'show' in detail_tr.get_attribute("class") or detail_tr.is_displayed()
+                )
+
+                # Now scope lookups to the detail_tr only (relative XPath with '.' prefix)
+                surface_area_td = detail_tr.find_element(
+                    By.XPATH,
+                    ".//th[contains(normalize-space(),'Surface Area')]/following-sibling::td"
+                )
+                volume_td = detail_tr.find_element(
+                    By.XPATH,
+                    ".//th[contains(normalize-space(),'Volume')]/following-sibling::td"
+                )
+                residues_td = detail_tr.find_element(
+                    By.XPATH,
+                    ".//th[contains(normalize-space(),'Residues')]/following-sibling::td"
+                )
+
+                # Extract texts
+                surface_area = surface_area_td.text.strip()
+                volume = volume_td.text.strip()
+                residues_text = residues_td.text.strip()
+                residues_list = [r.strip() for r in residues_text.split(',') if r.strip()]
+
+                print(f"Surface Area: {surface_area}, Volume: {volume}, #residues: {len(residues_list)}")
+
+                # --- WRITE VA DATA ---
+                va_writer.writerow([cavity_index, surface_area, volume])
+
+                # --- WRITE RESIDUES ---
+                line_num = len(residues_list)
+                for residue in residues_list:
+                    aa, seq_id, chain = residue.split('-')
+                    res_writer.writerow([cavity_index, chain, seq_id, aa])
+
+                print(f"Successfully wrote {line_num} lines for cavity {cavity_index}")
+
+                # --- COLLAPSE AGAIN ---
+                driver.execute_script("arguments[0].click();", more_button)
+                print(f"Collapsed details for row {cavity_index}")
+
+            print("\nAll cavities processed successfully.")
 
     except Exception as e:
         print(f"An error occurred while writing cavity results: {e}")
         raise
-#filenames pdb_name_cvpl_va.csv, pdb_name_cvpl_res.csv
 
 
 def run_cavity_plus(pdb_input: str, config: SectionProxy):
@@ -157,7 +201,7 @@ def run_cavity_plus(pdb_input: str, config: SectionProxy):
     cavity_plus_url = config['cavity_plus_url']
     input_dir = config['input_dir']
     output_dir = config['output_dir']
-    #pdb_input = config['pdb_input']
+    pocket_limit = int(config['pocket_limit'])
     pdb_name=os.path.splitext(pdb_input)[0]
 
     # Construct the full path to the PDB file
@@ -193,7 +237,7 @@ def run_cavity_plus(pdb_input: str, config: SectionProxy):
         )
         print("Download results button is now visible and clickable")
 
-        write_cavity_results(driver, pdb_name, output_dir)
+        write_cavity_results(driver, pdb_name, output_dir, pocket_limit=pocket_limit)
 
     except Exception as e:
         print(f"An error occurred: {e}")
