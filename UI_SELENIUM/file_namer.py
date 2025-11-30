@@ -18,7 +18,6 @@ class FileNamer:
         """Returns the residues filename for the given PDB name and method type."""
         return f"{pdb_name}_{method_type.value}_residues"
 
-
     @staticmethod
     def verify_pdb_exists(input_dir: str, pdb_file: str) -> bool:
         """

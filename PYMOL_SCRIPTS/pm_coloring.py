@@ -30,18 +30,21 @@ def generate_pml(seq_ids, pdb_file, output_dir, saved_file_name="color_and_save"
     png_path = os.path.join(output_dir, f"{saved_file_name}.png")
     pse_path = os.path.join(output_dir, f"{saved_file_name}.pse")
 
+    # Create a selection string for PyMOL
+    selection = " or ".join([f"resi {res}" for res in seq_ids])
+
     # Write the .pml script
     with open(pml_path, 'w') as f:
         f.write(f"load {pdb_file}\n")
-        for seq_id in seq_ids:
-            f.write(f"color red, resi {seq_id}\n")
+        f.write(f"select poc1, {selection}\n")
+        f.write("show sticks, poc1\n")
+        f.write("color red, poc1\n")
         f.write(f"save {pse_path}\n")
         f.write("ray 800, 600\n")
         f.write(f"png {png_path}\n")
         f.write("quit\n")
 
     return pml_path
-
 
 def main():
     config = read_config()
@@ -52,8 +55,8 @@ def main():
         config['pm_output'],
         saved_file_name="color_and_save"
     )
-    print(f"Generated color_and_save.pml for {len(seq_ids)} residues using {config['pdb_file']}.")
+    print(f"Generated {pml_path} for {len(seq_ids)} residues.")
+    print(f"Output files will be saved to {config['pm_output']}.")
 
 if __name__ == "__main__":
     main()
-
