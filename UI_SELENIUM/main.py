@@ -3,6 +3,7 @@ from configparser import SectionProxy
 
 from castpfold_to_csv import run_castpfold
 from cavity_plus_to_csv import run_cavity_plus
+from pupp_out_to_csv import  process_pupp_out_directory
 
 
 import os
@@ -30,6 +31,9 @@ def get_pdb_files(input_directory: str) -> list[str]:
     return pdb_files
 
 def run_4_predictions(pdb_files: list[str], config: SectionProxy) -> None:
+    pacupp_output_directory = config['pacupp_out_dir']
+    process_pupp_out_directory(pacupp_output_directory, config)
+
     for pdb_file in pdb_files:
         print(f'Running 4 predictions for {pdb_file}')
         run_castpfold(pdb_file, config)
