@@ -3,12 +3,18 @@ import csv
 
 import configparser
 from configparser import SectionProxy
+from file_namer import FileNamer, MethodType
+
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+
+import pandas as pd
+from openpyxl import Workbook
+
 import shutil
 import time
 import zipfile
@@ -34,9 +40,27 @@ def only_unzip_and_process():
     chrome_options = Options()
     script_dir = os.path.dirname(os.path.abspath(__file__))
 
-    download_dir = os.path.join(script_dir, output_dir, prankweb_temp)
-    #unpack_zip_in_directory(download_dir)
-    process_prankweb_output(download_dir)
+    download_dir = os.path.join(script_dir, output_dir, prankweb_temp, pdb_name)
+    unpack_zip_in_directory(download_dir)
+    process_prankweb_output(download_dir, pdb_name)
+    delete_directory(download_dir)
+
+
+def delete_directory(download_dir):
+    """
+    Deletes the specified directory and all its contents.
+    Args:
+        download_dir (str): Path to the directory to be deleted.
+    """
+    try:
+        if os.path.exists(download_dir):
+            shutil.rmtree(download_dir)
+            print(f"Directory '{download_dir}' and its contents have been deleted.")
+        else:
+            print(f"Directory '{download_dir}' does not exist. No action taken.")
+    except Exception as e:
+        print(f"Warning: Failed to delete directory '{download_dir}'. Error: {e}")
+
 
 def run_prankweb(pdb_input: str, config: SectionProxy):
     # Extract configuration values
@@ -55,7 +79,7 @@ def run_prankweb(pdb_input: str, config: SectionProxy):
     chrome_options = Options()
     script_dir = os.path.dirname(os.path.abspath(__file__))
 
-    download_dir = os.path.join(script_dir, output_dir,prankweb_temp)
+    download_dir = os.path.join(script_dir, output_dir, prankweb_temp, pdb_name)
     # Create the directory (or clear it if it exists and is not empty)
     if os.path.exists(download_dir):
         if os.listdir(download_dir):  # Check if directory is not empty
@@ -171,7 +195,7 @@ def unpack_zip_in_directory(download_dir):
         return None
 
 
-def process_prankweb_output(download_dir):
+def process_prankweb_output(download_dir, pdb_name):
     """
     Processes the PRANKWeb output files in the specified directory.
     Args:
@@ -221,8 +245,100 @@ def process_prankweb_output(download_dir):
             except KeyError:
                 print(f"Warning: Missing 'residue_label' or 'residue_name' column in '{residues_file}'.")
 
+    output_table = prepare_output_table(cav_residues, res_label_name)
+
+    write_csv(output_table, pdb_name, output_dir)
+    write_xlsx(output_table, pdb_name, output_dir)
+
+
     return cav_residues, res_label_name
 
+
+def prepare_output_table(cav_residues, res_label_name):
+    """
+    Prepares the output table for .csv and .xlsx files.
+    Args:
+        cav_residues (dict): Dictionary with cavity numbers as keys and residue IDs as values.
+        res_label_name (dict): Dictionary with residue labels as keys and residue names as values.
+    Returns:
+        list: List of dictionaries, each representing a row in the output table.
+    """
+    output_table = []
+
+    for cavity_number, residue_ids_str in cav_residues.items():
+        residue_ids = residue_ids_str.split()  # Split by spaces
+
+        for residue_id in residue_ids:
+            chain, seq_id = residue_id.split('_')  # Split by '_'
+            aa = res_label_name.get(seq_id, 'Unknown')  # Look up AA in res_label_name
+
+            row = {
+                "Cavity Number": cavity_number,
+                "Chain": chain,
+                "Seq ID": seq_id,
+                "AA": aa
+            }
+            output_table.append(row)
+
+    return output_table
+
+
+def write_csv(output_table, pdb_name, output_dir):
+    """
+    Writes the output table to a .csv file.
+    Args:
+        output_table (list): List of dictionaries representing the output table.
+        pdb_name (str): Name of the PDB file (used for the output filename).
+        output_dir (str): Directory where the output file will be saved.
+    """
+
+    # Create output subfolder
+    output_or_subfolder = os.path.join(os.getcwd(), output_dir, pdb_name)
+    os.makedirs(output_or_subfolder, exist_ok=True)
+
+    output_filename = FileNamer.get_residues_name(pdb_name, MethodType.P2RK) + ".csv"
+    output_path = os.path.join(output_or_subfolder, output_filename)
+
+    with open(output_path, mode='w', newline='') as csvfile:
+        fieldnames = ["Cavity Number", "Chain", "Seq ID", "AA"]
+        writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+
+        writer.writeheader()
+        writer.writerows(output_table)
+
+    print(f"Output table saved to '{output_path}'.")
+
+def write_xlsx(output_table, pdb_name, output_dir):
+    """
+    Writes the output table to an .xlsx file with multiple sheets.
+    Args:
+        output_table (list): List of dictionaries representing the output table.
+        pdb_name (str): Name of the PDB file (used for the output filename).
+        output_dir (str): Directory where the output file will be saved.
+    """
+    # Create output subfolder
+    output_or_subfolder = os.path.join(os.getcwd(), output_dir, pdb_name)
+    os.makedirs(output_or_subfolder, exist_ok=True)
+
+    # Use the same naming convention as for the CSV file
+    output_filename = FileNamer.get_residues_name(pdb_name, MethodType.P2RK) + ".xlsx"
+    output_path = os.path.join(output_or_subfolder, output_filename)
+
+    # Create a DataFrame from the output_table
+    df = pd.DataFrame(output_table)
+
+    # Create a dictionary to hold DataFrames for each cavity number
+    sheets = {}
+    for cavity_number in df["Cavity Number"].unique():
+        sheet_name = f"Cavity {cavity_number}"
+        sheets[sheet_name] = df[df["Cavity Number"] == cavity_number]
+
+    # Write to Excel with multiple sheets
+    with pd.ExcelWriter(output_path, engine='openpyxl') as writer:
+        for sheet_name, sheet_df in sheets.items():
+            sheet_df.to_excel(writer, sheet_name=sheet_name, index=False)
+
+    print(f"Output table saved to '{output_path}'.")
 
 
 if __name__ == '__main__':
@@ -232,5 +348,5 @@ if __name__ == '__main__':
     input_dir = config['input_dir']
     output_dir = config['output_dir']
     pdb_input = config['pdb_input']
-    #run_prankweb(pdb_input, config)
+    run_prankweb(pdb_input, config)
     only_unzip_and_process()
