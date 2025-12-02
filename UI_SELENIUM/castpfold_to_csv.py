@@ -1,9 +1,8 @@
 import configparser
 import csv
 import os
-import sys
 import time
-from configparser import ConfigParser, SectionProxy
+from configparser import SectionProxy
 
 from selenium.webdriver.common.by import By
 from selenium import webdriver
