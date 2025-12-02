@@ -24,25 +24,16 @@ def load_config():
     config.read('config.ini')
     return config['DEFAULT']
 
-def only_unzip_and_process():
-    chrome_driver_path = config['chrome_driver_path']
-    prankweb_url = config['prank_web_url']
-    input_dir = config['input_dir']
+def only_unzip_and_process(pdb_input: str, config: SectionProxy):
     output_dir = config['output_dir']
     prankweb_temp = config['prankweb_temp']
-    pocket_limit = int(config['pocket_limit'])
     pdb_name = os.path.splitext(pdb_input)[0]
 
-    # Construct the full path to the PDB file
-    pdb_file_path = os.path.abspath(os.path.join(input_dir, pdb_input))
-
-    # Set up Chrome options to automatically download files
-    chrome_options = Options()
     script_dir = os.path.dirname(os.path.abspath(__file__))
 
     download_dir = os.path.join(script_dir, output_dir, prankweb_temp, pdb_name)
     unpack_zip_in_directory(download_dir)
-    process_prankweb_output(download_dir, pdb_name)
+    process_prankweb_output(download_dir, pdb_name, output_dir)
     delete_directory(download_dir)
 
 
@@ -160,6 +151,7 @@ def run_prankweb(pdb_input: str, config: SectionProxy):
         print("This is finally, going to quit driver")
         driver.quit()
 
+    only_unzip_and_process(pdb_input, config)
     print("P2Rank script completed")
 
 def unpack_zip_in_directory(download_dir):
@@ -195,7 +187,7 @@ def unpack_zip_in_directory(download_dir):
         return None
 
 
-def process_prankweb_output(download_dir, pdb_name):
+def process_prankweb_output(download_dir, pdb_name, output_dir):
     """
     Processes the PRANKWeb output files in the specified directory.
     Args:
@@ -349,4 +341,4 @@ if __name__ == '__main__':
     output_dir = config['output_dir']
     pdb_input = config['pdb_input']
     run_prankweb(pdb_input, config)
-    only_unzip_and_process()
+    #only_unzip_and_process()
