@@ -37,6 +37,7 @@ def parse_txt_file(file_path):
 
 def process_pupp_out_directory(input_dir, config: SectionProxy) -> None:
     """Process all .txt files in the input directory and create CSV files."""
+    print("Processing pupp output directory:", input_dir)
     # Group files by {OR_name}
     or_name_files = defaultdict(list)
     for filename in os.listdir(input_dir):
