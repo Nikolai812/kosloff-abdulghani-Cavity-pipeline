@@ -1,6 +1,8 @@
 import configparser
 import csv
+import openpyxl
 import os
+
 import time
 from configparser import SectionProxy
 
@@ -13,7 +15,6 @@ from selenium.webdriver.support import expected_conditions as EC
 
 from castpfold_request import submit_castpfold_request
 from file_namer import FileNamer, MethodType
-
 
 def enter_text_in_input(driver, input_id, text):
     """
@@ -44,7 +45,7 @@ def load_config():
     return config['DEFAULT']
 
 
-def write_pocket_info_csv(driver, output_directory,pdb_name, pocket_limit):
+def prepare_pocket_info_for_save(driver, pocket_limit):
     # Locate the table element
     table = driver.find_element(By.CSS_SELECTOR, "table")
 
@@ -59,32 +60,26 @@ def write_pocket_info_csv(driver, output_directory,pdb_name, pocket_limit):
     rows = []
     tr_elements = table.find_elements(By.CSS_SELECTOR, "tbody tr")
     first_tr_elements = tr_elements[:pocket_limit]
+
     for tr in first_tr_elements:
         row = []
         for td in tr.find_elements(By.TAG_NAME, "td"):
             if td.text.strip():  # Skip empty cells
-
                 row.append(td.text.strip())
         if row:  # Only add non-empty rows
             rows.append(row)
 
-    # Write to CSV
-    os.makedirs(f"{output_directory}/{pdb_name}", exist_ok=True)
-    cspf_va_filename=FileNamer.get_va_name(pdb_name, MethodType.CSPF) + ".csv"
-    with open(f"{output_directory}/{pdb_name}/{cspf_va_filename}", 'w', newline='', encoding='utf-8') as csvfile:
-        writer = csv.writer(csvfile)
-        writer.writerow(headers)
-        writer.writerows(rows)
+    return headers, rows
 
-    print(f"Data written to {cspf_va_filename}")
-
-def open_atom_info_save_csv(driver, output_directory, pdb_name, pocket_limit):
+def prepare_atom_info_for_save(driver, pocket_limit):
     if pocket_limit > 10:
         raise ValueError(f"Pocket limit cannot be greater than 10, however requested pocket_limit was set to {pocket_limit}")
 
     # Locate all rows in the table
     pocket_rows = driver.find_elements(By.XPATH, "//table[.//th/div[contains(text(), 'Pocket ID')]]/tbody[1]/tr[contains(@class, 'ant-table-row-level-0')]")
     first_pocket_rows = pocket_rows[:pocket_limit]
+
+    cav_list_all_atom_rows = []
 
     for i, pocket_row in enumerate(first_pocket_rows):
         try:
@@ -110,17 +105,8 @@ def open_atom_info_save_csv(driver, output_directory, pdb_name, pocket_limit):
             page_texts = [item.text for item in li_pag_items]
             atom_tab_count = int(page_texts[-1])
 
-            # Initialize a list to store all rows from all pagination tabs
-            all_atom_rows = []
-
-            # Extract headers once (they are the same for all tabs)
-            atom_info_table = pocket_row.find_element(By.XPATH, "./following-sibling::tr//div[contains(@class, 'ant-table-content')]//table")
-            headers = []
-            header_row = atom_info_table.find_element(By.CSS_SELECTOR, "thead tr")
-            for th in header_row.find_elements(By.TAG_NAME, "th"):
-                if th.text.strip():
-                    headers.append(th.text.strip())
-            headers.append("Atom pagination tab")  # Add a new column for the tab number
+            # Initialize a set to store unique rows
+            unique_atom_rows = set()
 
             # Click on the first pagination tab to begin
             first_button = ul_atom_pagination[-1].find_element(By.CSS_SELECTOR, "li.ant-pagination-item-1")
@@ -132,14 +118,23 @@ def open_atom_info_save_csv(driver, output_directory, pdb_name, pocket_limit):
             for ia in range(1, atom_tab_count + 1):
                 # Extract rows from the current tab
                 atom_info_table = pocket_row.find_element(By.XPATH, "./following-sibling::tr//div[contains(@class, 'ant-table-content')]//table")
+
                 for tr in atom_info_table.find_elements(By.CSS_SELECTOR, "tbody tr"):
                     atom_row = []
                     for td in tr.find_elements(By.TAG_NAME, "td"):
                         if td.text.strip():
                             atom_row.append(td.text.strip())
+
                     if atom_row:
-                        atom_row.append(f"tab: {ia}")  # Add the tab number to the row
-                        all_atom_rows.append(atom_row)
+                        # Insert the cavity number (pocket_number = i + 1) as the first value in the row
+                        atom_row.insert(0, str(i + 1))
+
+                        # Remove the last (5th) value from the row
+                        if len(atom_row) > 4:
+                            atom_row = atom_row[:4]
+
+                        # Add the row to the set as a tuple (to avoid duplicates)
+                        unique_atom_rows.add(tuple(atom_row))
 
                 print(f"Atom pagination tab {ia} is displayed")
 
@@ -154,15 +149,13 @@ def open_atom_info_save_csv(driver, output_directory, pdb_name, pocket_limit):
                     )
                     ul_atom_pagination = pocket_row.find_elements(By.XPATH, "./following-sibling::tr[contains(@class, 'ant-table-expanded-row-level-1') and not(contains(@style, 'display: none'))]//ul[contains(@class, 'ant-pagination')]")
 
-            # Write all data to CSV
-            residues_csv_file_name = FileNamer.get_residues_name(pdb_name, MethodType.CSPF)
-            #with open(f"{output_directory}/pocket_{pocket_id}_atom_info.csv", 'w', newline='', encoding='utf-8') as csvfile:
-            with open(f"{output_directory}/{pdb_name}/{residues_csv_file_name}_{pocket_id}.csv", 'w', newline='',
-                      encoding='utf-8') as csvfile:
-                writer = csv.writer(csvfile)
-                writer.writerow(headers)
-                writer.writerows(all_atom_rows)
-            print(f"Atom info for pocket {pocket_id} saved to pocket_{pocket_id}_atom_info.csv")
+            # Convert the set of tuples back to a list of lists
+            all_atom_rows = [list(row) for row in unique_atom_rows]
+
+            # Sort the rows by "Seq ID" (column index 2)
+            all_atom_rows.sort(key=lambda x: int(x[2]))
+
+            cav_list_all_atom_rows.append(all_atom_rows)
 
             # Close the "Atom Info" section
             time.sleep(1)
@@ -178,9 +171,76 @@ def open_atom_info_save_csv(driver, output_directory, pdb_name, pocket_limit):
             WebDriverWait(driver, 10).until(EC.element_to_be_clickable(expand_icon))
             driver.execute_script("arguments[0].click();", expand_icon)
             time.sleep(0.5)
+
         except Exception as e:
             print(f"Error processing pocket {i}: {e}")
             raise
+
+    return cav_list_all_atom_rows
+
+def write_cav_all_atom_rows_to_csv(cav_list_all_atom_rows, output_directory, pdb_name):
+    headers = ['Cavity Number', 'Chain', 'Seq ID', 'AA']
+
+    for i, all_atom_rows in enumerate(cav_list_all_atom_rows):
+        residues_csv_file_name = FileNamer.get_residues_name(pdb_name, MethodType.CSPF)
+        with open(f"{output_directory}/{pdb_name}/{residues_csv_file_name}_{i + 1}.csv", 'w', newline='', encoding='utf-8') as csvfile:
+            writer = csv.writer(csvfile)
+            writer.writerow(headers)
+            writer.writerows(all_atom_rows)
+
+        print(f"Atom info for pocket {i + 1} saved to {residues_csv_file_name}_{i + 1}.csv")
+
+
+def write_cav_all_atom_rows_to_excel(headers, rows, cav_list_all_atom_rows, output_directory, pdb_name):
+    # Create a new Excel workbook
+    workbook = openpyxl.Workbook()
+
+    # Remove the default sheet created by openpyxl
+    workbook.remove(workbook.active)
+
+    # Create a worksheet for "Volumes Areas" as the first sheet
+    volumes_areas_sheet = workbook.create_sheet(title="Volumes and Areas", index=0)
+
+    # Write headers and rows to the "Volumes Areas" sheet
+    volumes_areas_sheet.append(headers)
+    for row in rows:
+        volumes_areas_sheet.append(row)
+
+    # Create a worksheet for each cavity
+    for i, all_atom_rows in enumerate(cav_list_all_atom_rows):
+        worksheet = workbook.create_sheet(title=f"Cavity {i + 1}")
+
+        # Write headers
+        worksheet.append(['Cavity Number', 'Chain', 'Seq ID', 'AA'])
+
+        # Write data rows
+        for row in all_atom_rows:
+            worksheet.append(row)
+
+    # Save the workbook to an Excel file
+    residues_excel_file_name = FileNamer.get_residues_name(pdb_name, MethodType.CSPF)
+    excel_file_path = f"{output_directory}/{pdb_name}/{residues_excel_file_name}.xlsx"
+    workbook.save(excel_file_path)
+
+    print(f"All atom info saved to {excel_file_path}")
+
+def write_pockets_to_csv(headers, rows, output_directory, pdb_name):
+    # Create the output directory if it doesn't exist
+    os.makedirs(f"{output_directory}/{pdb_name}", exist_ok=True)
+
+    # Generate the CSV filename
+    cspf_va_filename = FileNamer.get_va_name(pdb_name, MethodType.CSPF) + ".csv"
+
+    # Write to CSV
+    with open(f"{output_directory}/{pdb_name}/{cspf_va_filename}", 'w', newline='', encoding='utf-8') as csvfile:
+        writer = csv.writer(csvfile)
+        writer.writerow(headers)
+        writer.writerows(rows)
+
+    print(f"Data written to {cspf_va_filename}")
+
+
+
 
 
 def iterate_pagination(driver, output_directory, pdb_name: str, pocket_limit =1):
@@ -189,7 +249,7 @@ def iterate_pagination(driver, output_directory, pdb_name: str, pocket_limit =1)
 
     # Locate the pagination element
     pagination = driver.find_element(By.CSS_SELECTOR, "ul.ant-pagination")
-
+    time.sleep(1)
     # Find all pagination items (excluding "Previous" and "Next" buttons)
     pagination_items = pagination.find_elements(By.CSS_SELECTOR, "li.ant-pagination-item a")
 
@@ -211,8 +271,19 @@ def iterate_pagination(driver, output_directory, pdb_name: str, pocket_limit =1)
         # Print the current tab number
         print(f"Pagination tab {i} is displayed")
 
-        write_pocket_info_csv(driver, output_directory, pdb_name, pocket_limit)
-        open_atom_info_save_csv(driver, output_directory, pdb_name, pocket_limit)
+        # write_pocket_info_csv(driver, output_directory, pdb_name, pocket_limit)
+        # open_atom_info_save_csv(driver, output_directory, pdb_name, pocket_limit)
+
+        # Prepare data tables for saving
+        cav_va_headers, cav_va_rows = prepare_pocket_info_for_save(driver, pocket_limit)
+        cav_list_all_atom_rows = prepare_atom_info_for_save(driver, pocket_limit)
+        #########
+
+        # Save prepared data to file(s)
+        # write_pockets_to_csv(cav_va_headers, cav_va_rows, output_directory, pdb_name)
+        # write_cav_all_atom_rows_to_csv(cav_list_all_atom_rows, output_directory, pdb_name)
+        write_cav_all_atom_rows_to_excel(cav_va_headers, cav_va_rows, cav_list_all_atom_rows, output_directory, pdb_name)
+        ###############
 
         # If not the last tab, click "Next Page"
         if i < tab_count:
@@ -268,7 +339,17 @@ def run_castpfold(pdb_file, config: SectionProxy):
 
     try:
         # Open the specified URL
+        print(f"Waiting 20 secs for the job to complete...")
+        time.sleep(20)
+        print(f"Loading castpFold page...")
         driver.get(f"{base_url}?{job_number}")
+        # Wait until the button is visible and clickable
+        download_button = WebDriverWait(driver, 20).until(
+            EC.element_to_be_clickable(
+                (By.XPATH, "//button[contains(@class, 'ant-btn-primary') and .//span[text()='Download CASTpFold Data']]")
+            )
+        )
+        print(f"Download button appeared with text: {download_button.text}")
         time.sleep(1)
         iterate_pagination(driver, output_directory=output_directory,pdb_name=pdb_name, pocket_limit=pocket_limit)
         time.sleep(1)
@@ -283,4 +364,4 @@ def run_castpfold(pdb_file, config: SectionProxy):
 
 if __name__ == '__main__':
     config = load_config()
-    run_castpfold("HsOR343CF_1", config)
+    #run_castpfold("input/HsOR343CF_1", config)

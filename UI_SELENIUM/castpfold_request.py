@@ -13,14 +13,19 @@ def submit_castpfold_request(pdb_file: str)  ->str:
 
     # === CREATE CLIENT ===
     client = CastpFoldClient()
+    
+    jobID = client.submit(pdb_path= Path(pdb_file), radius=probe_radius, email="N/A")
+    
     # === OPTION 1: Full workflow (submit + download + optional pockets) ===
-    result: CastpFoldResultPaths = client.run(
-        pdb= Path(pdb_file),
-        out_dir= Path(os.getcwd()),
-        radius=probe_radius,
-        compute_pockets=compute_pockets,
-        email="N/A"
-    )
+    # result: CastpFoldResultPaths = client.run(
+    #     pdb= Path(pdb_file),
+    #     out_dir= Path(os.getcwd()),
+    #     radius=probe_radius,
+    #     compute_pockets=compute_pockets,
+    #     email="N/A"
+    # )
+     
+     
 
-    print(f"Job ID: {result.jobid}")
-    return result.jobid
+    print(f"Job ID: {jobID}")
+    return jobID
