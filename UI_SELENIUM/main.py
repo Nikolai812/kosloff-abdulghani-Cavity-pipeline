@@ -34,6 +34,7 @@ def get_pdb_files(input_directory: str) -> list[str]:
 def run_4_predictions(pdb_files: list[str], config: SectionProxy) -> None:
     # Processing output files of pacupp JMOL script
     # It is expected, that java JMOL pacupp has been run prior to this python script
+
     print(f"Expecting that java pacupp has already completed. Processing pacupp output files for {pdb_files} ")
     pacupp_output_directory = config['pacupp_out_dir']
     process_pupp_out_directory(pacupp_output_directory, config)
@@ -42,7 +43,7 @@ def run_4_predictions(pdb_files: list[str], config: SectionProxy) -> None:
         print(f'Running 4 predictions for {pdb_file}')
         #run_castpfold(pdb_file, config)
         run_cavity_plus(pdb_file, config)
-        #run_prankweb(pdb_file, config)
+        run_prankweb(pdb_file, config)
     pass
 
 

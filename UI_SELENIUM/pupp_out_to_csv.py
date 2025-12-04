@@ -71,14 +71,14 @@ def process_pupp_out_directory(input_dir, config: SectionProxy) -> None:
                 key = (cavity_number, entry["Chain"], entry["SeqNo"], entry["Res"])
                 unique_entries[or_name].add(key)
 
-    # Write CSV files for each {OR_name}
+    # Write Excel file for each {OR_name} (CSV postponed and commented out)
     output_dir = config['output_dir']
     for or_name, entries in unique_entries.items():
         output_path = os.path.join(os.getcwd(), output_dir, or_name)
         os.makedirs(output_path, exist_ok=True)
-        csv_res_filename =  FileNamer.get_residues_name(or_name, MethodType.PUPP) + ".csv" # f"{or_name}_pupp_residues.csv"
-        csv_path = os.path.join(output_path, csv_res_filename)
-        write_to_csv(csv_path, entries)
+        # csv_res_filename =  FileNamer.get_residues_name(or_name, MethodType.PUPP) + ".csv" # f"{or_name}_pupp_residues.csv"
+        # csv_path = os.path.join(output_path, csv_res_filename)
+        # write_to_csv(csv_path, entries)
 
         xls_res_filename = FileNamer.get_residues_name(or_name,
                                                        MethodType.PUPP) + ".xlsx"  # f"{or_name}_pupp_residues.csv"

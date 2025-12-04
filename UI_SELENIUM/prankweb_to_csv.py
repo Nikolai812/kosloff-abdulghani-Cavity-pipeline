@@ -239,7 +239,7 @@ def process_prankweb_output(download_dir, pdb_name, output_dir):
 
     output_table = prepare_output_table(cav_residues, res_label_name)
 
-    write_csv(output_table, pdb_name, output_dir)
+    ## write_csv(output_table, pdb_name, output_dir)
     write_xlsx(output_table, pdb_name, output_dir)
 
 

@@ -66,8 +66,8 @@ def upload_and_submit_pdb(driver, pdb_file_path, pdb_input):
         raise
 
 
-
-def write_cavity_results(driver, pdb_name, output_dir="output", pocket_limit= -1):
+def prepare_cavity_tables(driver, pocket_limit=-1):
+    """Extract cavity data and return tables as lists of rows."""
     try:
         # Wait for the Cavity Results table
         table_locator = (By.CSS_SELECTOR, "div.accordion-collapse.show table.table")
@@ -82,7 +82,6 @@ def write_cavity_results(driver, pdb_name, output_dir="output", pocket_limit= -1
             "/ancestor::div[contains(@class,'container')]"
             "//table[1]/tbody/tr[count(td)=7]"
         )
-
         total_rows = len(rows)
         print(f"Found {total_rows} cavity rows.")
 
@@ -93,15 +92,87 @@ def write_cavity_results(driver, pdb_name, output_dir="output", pocket_limit= -1
                     f"WARNING: pocket_limit={pocket_limit} exceeds total cavities ({total_rows}). "
                     f"Processing all available cavities instead."
                 )
-                rows_to_process = rows  # safe
+                rows_to_process = rows
             else:
                 print(f"Applying pocket limit: processing first {pocket_limit} cavities.")
-                rows_to_process = rows[:pocket_limit]  # always safe
+                rows_to_process = rows[:pocket_limit]
         else:
             rows_to_process = rows
 
-        # Iterate only over the selected row
+        # Initialize tables
+        va_table = [['Cavity Number', 'Surface Area', 'Volume']]
+        residues_table = [['Cavity Number', 'Chain', 'Seq ID', 'AA']]
 
+        # Iterate over rows
+        for cavity_index, row in enumerate(rows_to_process, start=1):
+            print(f"\nProcessing cavity row {cavity_index}...")
+            cavity_number = row.find_element(By.XPATH, "./td[1]").text.strip()
+            if not cavity_number:
+                raise RuntimeError(f"Could not read cavity number for row index {cavity_index}")
+
+            # --- CLICK MORE BUTTON ---
+            more_button = row.find_element(
+                By.CSS_SELECTOR,
+                "td:last-child div[style*='color: blue']"
+            )
+            driver.execute_script("arguments[0].scrollIntoView();", more_button)
+            driver.execute_script("arguments[0].click();", more_button)
+            print(f"Expanded details for row {cavity_index}")
+
+            # Wait for expanded detail row
+            detail_tr_id = f"more_{cavity_number}"
+            WebDriverWait(driver, 15).until(
+                EC.presence_of_element_located((By.ID, detail_tr_id))
+            )
+            detail_tr = driver.find_element(By.ID, detail_tr_id)
+            WebDriverWait(driver, 10).until(
+                lambda d: 'show' in detail_tr.get_attribute("class") or detail_tr.is_displayed()
+            )
+
+            # Extract data
+            surface_area_td = detail_tr.find_element(
+                By.XPATH,
+                ".//th[contains(normalize-space(),'Surface Area')]/following-sibling::td"
+            )
+            volume_td = detail_tr.find_element(
+                By.XPATH,
+                ".//th[contains(normalize-space(),'Volume')]/following-sibling::td"
+            )
+            residues_td = detail_tr.find_element(
+                By.XPATH,
+                ".//th[contains(normalize-space(),'Residues')]/following-sibling::td"
+            )
+
+            surface_area = surface_area_td.text.strip()
+            volume = volume_td.text.strip()
+            residues_text = residues_td.text.strip()
+            residues_list = [r.strip() for r in residues_text.split(',') if r.strip()]
+
+            print(f"Surface Area: {surface_area}, Volume: {volume}, #residues: {len(residues_list)}")
+
+            # --- POPULATE VA TABLE ---
+            va_table.append([cavity_index, surface_area, volume])
+
+            # --- POPULATE RESIDUES TABLE ---
+            for residue in residues_list:
+                aa, seq_id, chain = residue.split('-')
+                residues_table.append([cavity_index, chain, seq_id, aa])
+
+            # --- COLLAPSE ROW ---
+            driver.execute_script("arguments[0].click();", more_button)
+            print(f"Collapsed details for row {cavity_index}")
+
+        print("\nAll cavities processed successfully.")
+        return va_table, residues_table
+
+    except Exception as e:
+        print(f"An error occurred while preparing cavity tables: {e}")
+        raise
+
+
+def write_to_csv(va_table, residues_table, pdb_name, output_dir="output"):
+    """Write tables to CSV files."""
+    try:
         # Create output subfolder
         output_path = os.path.join(os.getcwd(), output_dir, pdb_name)
         os.makedirs(output_path, exist_ok=True)
@@ -110,88 +181,108 @@ def write_cavity_results(driver, pdb_name, output_dir="output", pocket_limit= -1
         va_csv_filename = FileNamer.get_va_name(pdb_name, MethodType.CVPL) + ".csv"
         residues_csv_filename = FileNamer.get_residues_name(pdb_name, MethodType.CVPL) + ".csv"
 
-        # Open CSVs
-        with open(os.path.join(output_path, va_csv_filename), 'w', newline='', encoding='utf-8') as va_file, \
-             open(os.path.join(output_path, residues_csv_filename), 'w', newline='', encoding='utf-8') as res_file:
+        # Write VA table
+        with open(os.path.join(output_path, va_csv_filename), 'w', newline='', encoding='utf-8') as va_file:
+            csv.writer(va_file).writerows(va_table)
 
-            va_writer = csv.writer(va_file)
-            res_writer = csv.writer(res_file)
+        # Write residues table
+        with open(os.path.join(output_path, residues_csv_filename), 'w', newline='', encoding='utf-8') as res_file:
+            csv.writer(res_file).writerows(residues_table)
 
-            # Headers
-            va_writer.writerow(['Cavity Number', 'Surface Area', 'Volume'])
-            res_writer.writerow(['Cavity Number', 'Chain', 'Seq ID', 'AA'])
-
-            # Iterate over actual row elements (stable)
-            for cavity_index, row in enumerate(rows_to_process, start=1):
-                print(f"\nProcessing cavity row {cavity_index}...")
-                cavity_number = row.find_element(By.XPATH, "./td[1]").text.strip()
-                if not cavity_number:
-                    raise RuntimeError(f"Could not read cavity number for row index {cavity_index}")
-
-                # --- CLICK MORE BUTTON INSIDE THIS ROW ---
-                more_button = row.find_element(
-                    By.CSS_SELECTOR,
-                    "td:last-child div[style*='color: blue']"
-                )
-
-                driver.execute_script("arguments[0].scrollIntoView();", more_button)
-                driver.execute_script("arguments[0].click();", more_button)
-                print(f"Expanded details for row {cavity_index}")
-
-                # Wait for the expanded detail <tr id='more_{cavity_number}'> to appear (and be visible)
-                detail_tr_id = f"more_{cavity_number}"
-                WebDriverWait(driver, 15).until(
-                    EC.presence_of_element_located((By.ID, detail_tr_id))
-                )
-                detail_tr = driver.find_element(By.ID, detail_tr_id)
-
-                # Optionally wait until it has class 'collapse show' or is displayed
-                WebDriverWait(driver, 10).until(
-                    lambda d: 'show' in detail_tr.get_attribute("class") or detail_tr.is_displayed()
-                )
-
-                # Now scope lookups to the detail_tr only (relative XPath with '.' prefix)
-                surface_area_td = detail_tr.find_element(
-                    By.XPATH,
-                    ".//th[contains(normalize-space(),'Surface Area')]/following-sibling::td"
-                )
-                volume_td = detail_tr.find_element(
-                    By.XPATH,
-                    ".//th[contains(normalize-space(),'Volume')]/following-sibling::td"
-                )
-                residues_td = detail_tr.find_element(
-                    By.XPATH,
-                    ".//th[contains(normalize-space(),'Residues')]/following-sibling::td"
-                )
-
-                # Extract texts
-                surface_area = surface_area_td.text.strip()
-                volume = volume_td.text.strip()
-                residues_text = residues_td.text.strip()
-                residues_list = [r.strip() for r in residues_text.split(',') if r.strip()]
-
-                print(f"Surface Area: {surface_area}, Volume: {volume}, #residues: {len(residues_list)}")
-
-                # --- WRITE VA DATA ---
-                va_writer.writerow([cavity_index, surface_area, volume])
-
-                # --- WRITE RESIDUES ---
-                line_num = len(residues_list)
-                for residue in residues_list:
-                    aa, seq_id, chain = residue.split('-')
-                    res_writer.writerow([cavity_index, chain, seq_id, aa])
-
-                print(f"Successfully wrote {line_num} lines for cavity {cavity_index}")
-
-                # --- COLLAPSE AGAIN ---
-                driver.execute_script("arguments[0].click();", more_button)
-                print(f"Collapsed details for row {cavity_index}")
-
-            print("\nAll cavities processed successfully.")
+        print(f"CSV files written successfully to {output_path}")
 
     except Exception as e:
-        print(f"An error occurred while writing cavity results: {e}")
+        print(f"An error occurred while writing CSV files: {e}")
         raise
+
+def write_to_xlsx(va_table, residues_table, pdb_name, output_dir="output"):
+    """Write tables to an Excel file with worksheets for VA data and per-cavity residues."""
+    try:
+        import openpyxl
+        from openpyxl.utils import get_column_letter
+
+        # Create output subfolder
+        output_path = os.path.join(os.getcwd(), output_dir, pdb_name)
+        os.makedirs(output_path, exist_ok=True)
+
+        # File name
+        xlsx_filename = FileNamer.get_residues_name(pdb_name, MethodType.CVPL) + ".xlsx"
+        xlsx_path = os.path.join(output_path, xlsx_filename)
+
+        # Create a new Excel workbook
+        workbook = openpyxl.Workbook()
+
+        # Remove the default sheet created by openpyxl
+        if "Sheet" in workbook.sheetnames:
+            workbook.remove(workbook["Sheet"])
+
+        # --- WRITE VA TABLE TO 'Volumes and Areas' WORKSHEET ---
+        va_sheet = workbook.create_sheet("Volumes and Areas")
+        for row in va_table:
+            va_sheet.append(row)
+
+        # Auto-adjust column widths for VA sheet
+        for column in va_sheet.columns:
+            max_length = 0
+            for cell in column:
+                try:
+                    if len(str(cell.value)) > max_length:
+                        max_length = len(str(cell.value))
+                except:
+                    pass
+            adjusted_width = (max_length + 2) * 1.2
+            va_sheet.column_dimensions[get_column_letter(column[0].column)].width = adjusted_width
+
+        # --- WRITE RESIDUES TABLE TO PER-CAVITY WORKSHEETS ---
+        # Group residues by cavity number (first column in residues_table)
+        cavities = {}
+        for row in residues_table[1:]:  # Skip header
+            cavity_num = row[0]
+            if cavity_num not in cavities:
+                cavities[cavity_num] = []
+            cavities[cavity_num].append(row)  # Include cavity number in the data
+
+        # Write each cavity's residues to a separate worksheet
+        for cavity_num, residues in cavities.items():
+            sheet_name = f"Cavity {cavity_num}"
+            cavity_sheet = workbook.create_sheet(sheet_name)
+
+            # Write header (including cavity number)
+            cavity_sheet.append(residues_table[0])  # Full header from residues_table
+
+            # Write residues
+            for residue in residues:
+                cavity_sheet.append(residue)
+
+            # Auto-adjust column widths
+            for column in cavity_sheet.columns:
+                max_length = 0
+                for cell in column:
+                    try:
+                        if len(str(cell.value)) > max_length:
+                            max_length = len(str(cell.value))
+                    except:
+                        pass
+                adjusted_width = (max_length + 2) * 1.2
+                cavity_sheet.column_dimensions[get_column_letter(column[0].column)].width = adjusted_width
+
+        # Save the workbook
+        workbook.save(xlsx_path)
+        print(f"Excel file written successfully to {xlsx_path}")
+
+    except ImportError:
+        raise ImportError("openpyxl is required for Excel export. Install it with: pip install openpyxl")
+    except Exception as e:
+        print(f"An error occurred while writing the Excel file: {e}")
+        raise
+
+
+
+def write_cavity_results(driver, pdb_name, output_dir="output", pocket_limit=-1):
+    """Refactored method to prepare tables and write to CSV."""
+    va_table, residues_table = prepare_cavity_tables(driver, pocket_limit)
+    ## write_to_csv(va_table, residues_table, pdb_name, output_dir)
+    write_to_xlsx(va_table, residues_table, pdb_name, output_dir)
 
 
 def run_cavity_plus(pdb_input: str, config: SectionProxy):
