@@ -9,9 +9,27 @@ from pupp_out_to_csv import  process_pupp_out_directory
 
 import os
 
-def load_config():
+def load_config0():
     config = configparser.ConfigParser()
     config.read('config.ini')
+    return config['DEFAULT']
+
+
+def load_config():
+    config = configparser.ConfigParser()
+    script_dir = os.path.dirname(os.path.abspath(__file__))  # folder where main.py is
+    config_path = os.path.join(script_dir, "config.ini")
+    config.read(config_path, encoding="utf-8")
+
+    # Updating all relative paths from config to get the absolute values starting from the location of tha main.py file
+    config['DEFAULT']['script_dir'] = script_dir
+    config['DEFAULT']['input_dir'] = os.path.join(script_dir, config['DEFAULT']['input_dir'])
+    config['DEFAULT']['output_dir'] = os.path.join(script_dir, config['DEFAULT']['output_dir'])
+    config['DEFAULT']['pacupp_out_dir'] = os.path.join(script_dir, config['DEFAULT']['pacupp_out_dir'])
+    config['DEFAULT']['prankweb_temp'] = os.path.join(script_dir, config['DEFAULT']['prankweb_temp'])
+    # End of relative path update
+
+    print(f"Configuration loaded from {config_path}, sections: {config.sections()} defaults: {config.defaults()}")
     return config['DEFAULT']
 
 
@@ -50,6 +68,7 @@ def run_4_predictions(pdb_files: list[str], config: SectionProxy) -> None:
 if __name__ == '__main__':
     print("Starting main.py script...")
     config = load_config()
+    print(f"DEFAULT config: {config.items()}")
     input_dir = config['input_dir']
     pdb_files= get_pdb_files(input_dir)
     run_4_predictions(pdb_files, config)
