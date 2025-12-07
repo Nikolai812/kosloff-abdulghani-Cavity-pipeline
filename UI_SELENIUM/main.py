@@ -57,7 +57,7 @@ def run_4_predictions(pdb_files: list[str], config: SectionProxy) -> None:
     pacupp_python_feedup = config['pacupp_python_feedup']
     process_pupp_out_directory(pacupp_python_feedup, config)
 
-    raise Exception("Temporary stop")
+    #raise Exception("Temporary stop")
 
     for pdb_file in pdb_files:
         print(f'Running 4 predictions for {pdb_file}')
