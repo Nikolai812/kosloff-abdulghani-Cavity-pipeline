@@ -25,7 +25,7 @@ def load_config():
     config['DEFAULT']['script_dir'] = script_dir
     config['DEFAULT']['input_dir'] = os.path.join(script_dir, config['DEFAULT']['input_dir'])
     config['DEFAULT']['output_dir'] = os.path.join(script_dir, config['DEFAULT']['output_dir'])
-    config['DEFAULT']['pacupp_out_dir'] = os.path.join(script_dir, config['DEFAULT']['pacupp_out_dir'])
+    config['DEFAULT']['pacupp_python_feedup'] = os.path.join(script_dir, config['DEFAULT']['pacupp_python_feedup'])
     config['DEFAULT']['prankweb_temp'] = os.path.join(script_dir, config['DEFAULT']['prankweb_temp'])
     # End of relative path update
 

@@ -45,6 +45,8 @@ def process_pupp_out_directory(input_dir, config: SectionProxy) -> None:
             or_name = filename.split("_cavities_")[0]
             or_name_files[or_name].append(filename)
 
+    # Initialize a dictionary to store unique entries
+    unique_entries = defaultdict(set)
     # Verify 5 APOLAR and 5 POLAR files for each {OR_name}
     for or_name, filenames in or_name_files.items():
         apolar_files = [f for f in filenames if "_APOLAR_" in f]
@@ -53,8 +55,7 @@ def process_pupp_out_directory(input_dir, config: SectionProxy) -> None:
             print(f"Warning: {or_name} does not have 5 APOLAR and 5 POLAR files. Skipping.")
             continue
 
-        # Initialize a dictionary to store unique entries
-        unique_entries = defaultdict(set)
+        #unique_entries = defaultdict(set)
 
         # Process each file
         for filename in filenames:
