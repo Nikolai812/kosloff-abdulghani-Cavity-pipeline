@@ -54,8 +54,10 @@ def run_4_predictions(pdb_files: list[str], config: SectionProxy) -> None:
     # It is expected, that java JMOL pacupp has been run prior to this python script
 
     print(f"Expecting that java pacupp has already completed. Processing pacupp output files for {pdb_files} ")
-    pacupp_output_directory = config['pacupp_out_dir']
-    process_pupp_out_directory(pacupp_output_directory, config)
+    pacupp_python_feedup = config['pacupp_python_feedup']
+    process_pupp_out_directory(pacupp_python_feedup, config)
+
+    raise Exception("Temporary stop")
 
     for pdb_file in pdb_files:
         print(f'Running 4 predictions for {pdb_file}')
