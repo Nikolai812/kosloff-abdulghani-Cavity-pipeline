@@ -111,7 +111,7 @@ def write_to_excel(excel_path,  unique_entries):
 
     # Create a sheet for each cavity number
     for cavity_number, entries in cavities.items():
-        sheet_name = f"cavity {cavity_number}"
+        sheet_name = f"Cavity {cavity_number}"
         sheet = workbook.create_sheet(sheet_name)
         sheet.append(["Cavity Number", "Chain", "Seq ID", "AA"])
         for entry in entries:
