@@ -3,20 +3,16 @@ import os
 
 import pandas as pd
 import stat
-
+import shutil
 
 def read_config():
     config = configparser.ConfigParser()
     config.read('pm_config.ini')
     return {
-        'vis_input_csv': config['visualization']['vis_input_csv'],
         'pdb_file': config['visualization']['pdb_file'],
-        'pm_output': config['visualization']['pm_output'],
+        'pm_output_dir': config['visualization']['pm_output_dir'],
         'pm_input_dir': config['visualization']['pm_input_dir']
     }
-
-
-
 
 def read_input_xlsx_files(directory):
     # Initialize the main dictionary to store all data
@@ -71,8 +67,6 @@ def read_input_xlsx_files(directory):
 
     return all_files_data
 
-
-
 def generate_multi_cav_pml(all_files_data, pdb_dir, output_dir):
     """
     Generates PyMOL scripts for each file_key in all_files_data.
@@ -111,7 +105,7 @@ def generate_multi_cav_pml(all_files_data, pdb_dir, output_dir):
 
         # Write the .pml script
         with open(pml_path, 'w') as f:
-            f.write(f"load {pdb_file}\n")
+            f.write(f"load {pdb_base}.pdb\n") #f.write(f"load {pdb_file}\n")
 
             # Create selections and color them for each cavity
             for cav_name, seq_ids in cavities.items():
@@ -122,20 +116,97 @@ def generate_multi_cav_pml(all_files_data, pdb_dir, output_dir):
                     f.write(f"color {cavity_colors[cav_name]}, {cav_name}\n")
 
             # Save the session and image
-            f.write(f"save {pse_path}\n")
+            f.write(f"save {file_key}.pse\n")  #f.write(f"save {pse_path}\n")
             f.write("ray 800, 600\n")
-            f.write(f"png {png_path}\n")
+            f.write(f"png {file_key}.png\n")    # f.write(f"png {png_path}\n")
             f.write("quit\n")
 
         print(f"  Generated {pml_path}")
         print(f"  Output files: {pse_path}, {png_path}")
 
 
+def prepare_for_pymol(input_directory, output_directory, copy_input=False):
+    """
+    Prepares PyMOL scripts for all 1st-level subdirectories in input_directory.
+    Verifies .pdb and .xlsx files, creates output subdirectories, and generates PyMOL scripts.
+
+    Args:
+        input_directory (str): Path to the input directory containing 1st-level subdirectories.
+        output_directory (str): Path to the output directory where results will be saved.
+        copy_input (bool): If True, copies input files to the output subdirectories.
+    """
+    # Ensure output directory exists
+    os.makedirs(output_directory, exist_ok=True)
+
+    # Iterate over 1st-level subdirectories in input_directory
+    for subdir_name in os.listdir(input_directory):
+        subdir_path = os.path.join(input_directory, subdir_name)
+
+        # Skip if not a directory
+        if not os.path.isdir(subdir_path):
+            continue
+
+        print(f"\nProcessing subdirectory: {subdir_name}")
+
+        # Step 1: Verify .pdb file
+        pdb_files = [f for f in os.listdir(subdir_path) if f.endswith('.pdb')]
+        if len(pdb_files) != 1:
+            print(f"  Warning: Expected 1 .pdb file in {subdir_name}, found {len(pdb_files)}")
+            continue
+
+        pdb_file = pdb_files[0]
+        or_name = subdir_name
+        if not pdb_file.startswith(or_name):
+            print(f"  Warning: PDB file '{pdb_file}' does not start with '{or_name}' in {subdir_name}")
+            continue
+
+        # Step 2: Verify .xlsx files (exclude hidden files)
+        xlsx_files = []
+        for filename in os.listdir(subdir_path):
+            file_path = os.path.join(subdir_path, filename)
+
+            # Skip hidden files
+            try:
+                file_attr = os.stat(file_path).st_file_attributes
+                if file_attr & stat.FILE_ATTRIBUTE_HIDDEN:
+                    continue
+            except AttributeError:
+                if filename.startswith('.'):
+                    continue
+
+            if filename.endswith('.xlsx') and filename.startswith(or_name):
+                xlsx_files.append(filename)
+
+        if len(xlsx_files) != 4:
+            print(f"  Warning: Expected 4 .xlsx files starting with '{or_name}' in {subdir_name}, found {len(xlsx_files)}")
+            continue
+
+        # Step 3: Create output subdirectory
+        output_subdir = os.path.join(output_directory, subdir_name)
+        if os.path.exists(output_subdir):
+            print(f"  Warning: Output directory '{output_subdir}' already exists, deleting it")
+            shutil.rmtree(output_subdir)  # Delete existing subdirectory
+        os.makedirs(output_subdir)
+
+        # Step 4: Copy input files if requested
+        if copy_input:
+            for filename in os.listdir(subdir_path):
+                src_path = os.path.join(subdir_path, filename)
+                dst_path = os.path.join(output_subdir, filename)
+                if os.path.isfile(src_path):
+                    shutil.copy2(src_path, dst_path)
+
+        # Step 5: Read .xlsx files and generate PyMOL scripts
+        all_files_data = read_input_xlsx_files(subdir_path)
+        generate_multi_cav_pml(all_files_data, subdir_path, output_subdir)
+
+        print(f"  Successfully processed {subdir_name}")
+
 
 def main():
     config = read_config()
-    input_or_subdir=config['pm_input_dir'] + "/HsOR343CF_1"
-    file_seq_dict = read_input_xlsx_files(input_or_subdir)
-    generate_multi_cav_pml(file_seq_dict, input_or_subdir, input_or_subdir)
+    pm_input_dir=config['pm_input_dir']
+    pm_output_dir=config['pm_output_dir']
+    prepare_for_pymol(pm_input_dir, pm_output_dir, copy_input=True)
 if __name__ == "__main__":
     main()
