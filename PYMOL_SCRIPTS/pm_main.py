@@ -22,11 +22,11 @@ def main():
     selenium_output_dir=config['selenium_output_dir']
     best_cavity_strategy=config['best_cavity_strategy']
 
-    # 1. Creating consensus file
-    ConsensusBuilder.process_multi_or_folder(selenium_output_dir, pm_output_dir, best_cavity_strategy)
+    # 1. Creating consensus file (in a pm_input dir for further script creation)
+    ConsensusBuilder.process_multi_or_folder(selenium_output_dir, pm_input_dir, best_cavity_strategy)
     print("")
 
     # 2. Preparing coloring scripts for PyMol
-    # prepare_for_pymol(pm_input_dir, pm_output_dir, copy_input=True)
+    prepare_for_pymol(pm_input_dir, pm_output_dir, copy_input=True)
 if __name__ == "__main__":
     main()

@@ -160,10 +160,10 @@ class ConsensusBuilder:
             Seq ID | cspf | cvpl | p2rk | pupp
         """
 
-        # Extract all Seq ID values from all four tools
+        # Extract all Seq ID values from all four prediction methods
         all_ids = set()
 
-        for tool, (_, seq_list) in best_cavity_ids.items():
+        for method_key, (_, seq_list) in best_cavity_ids.items():
             all_ids.update(seq_list)
 
         # Sort them ascending
@@ -194,11 +194,12 @@ class ConsensusBuilder:
         # Create DataFrame
         df = pd.DataFrame(rows, columns=["Seq ID", "cspf", "cvpl", "p2rk", "pupp", "consensus"])
 
-        # Ensure output directory exists
-        os.makedirs(output_dir, exist_ok=True)
+        # Create subdirectory inside output_dir
+        sub_output_dir = os.path.join(output_dir, sub)
+        os.makedirs(sub_output_dir, exist_ok=True)
 
-        # Save Excel file
-        out_path = os.path.join(output_dir, f"{sub}_consensus.xlsx")
+        # Save Excel file inside that subdirectory
+        out_path = os.path.join(sub_output_dir, f"{sub}_consensus.xlsx")
         df.to_excel(out_path, index=False)
 
         print(f"Consensus file saved: {out_path}")
