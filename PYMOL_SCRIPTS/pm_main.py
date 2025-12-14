@@ -7,7 +7,6 @@ def read_config():
     config = configparser.ConfigParser()
     config.read('pm_config.ini')
     return {
-        'pdb_file': config['visualization']['pdb_file'],
         'pm_output_dir': config['visualization']['pm_output_dir'],
         'pm_input_dir': config['visualization']['pm_input_dir'],
         'selenium_output_dir': config['visualization']['selenium_output_dir'],
