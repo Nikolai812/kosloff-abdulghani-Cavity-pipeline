@@ -36,31 +36,49 @@ def read_input_xlsx_files(directory):
                 print(f"Skipping hidden file: {filename}")
                 continue
 
-        # Process only .xlsx files
-        file_key = filename.split('_residues')[0]
+        # Process only .xlsx files including consensus
+        file_key = filename.split('_residues')[0] if 'consensus' not in filename else filename.split('.')[0] #filename.split('_consensus')[0]
         if filename.endswith('.xlsx'):
             print(f"Processing file: {filename}")
 
             # Initialize the dictionary for this file's cavities
             file_data = {}
 
-            # Check each cavity worksheet (1 to 5)
-            for cavity_num in range(1, 6):
-                sheet_name = f"Cavity {cavity_num}"
-                sheet_short_name = f"cav_{cavity_num}"
+            if 'consensus' in filename:
+                # Handle consensus files: read from "Sheet 1" and filter by "consensus" column
                 try:
-                    # Read the worksheet
-                    df = pd.read_excel(file_path, sheet_name=sheet_name)
-
-                    # Extract the "Seq ID" column (3rd column, index 2)
-                    if "Seq ID" in df.columns:
-                        seq_ids = df["Seq ID"].dropna().astype(str).tolist()
-                        file_data[sheet_short_name] = seq_ids
-                        print(f"  Found {len(seq_ids)} seq IDs in {sheet_name} ({len(seq_ids)}, expected to be distinct)")
+                    df = pd.read_excel(file_path, sheet_name="Sheet1")
+                    if "Seq ID" in df.columns and "consensus" in df.columns:
+                        # Filter rows where "consensus" == 1
+                        consensus_rows = df[df["consensus"] == 1]
+                        seq_ids = consensus_rows["Seq ID"].dropna().astype(str).tolist()
+                        file_data["consensus"] = seq_ids
+                        print(f"  Found {len(seq_ids)} consensus seq IDs in Sheet 1")
                     else:
-                        print(f"  Warning: 'Seq ID' column not found in {sheet_name} of {filename}")
+                        print(f"  Warning: 'Seq ID' or 'consensus' column not found in Sheet 1 of {filename}")
                 except Exception as e:
-                    print(f"  Could not read {sheet_name} in {filename}: {e}")
+                    print(f"  Could not read Sheet 1 in {filename}: {e}")
+
+            else:
+                # Handle non-consensus files: read from Cavity 1-5 worksheets
+                for cavity_num in range(1, 6):
+                    sheet_name = f"Cavity {cavity_num}"
+                    sheet_short_name = f"cav_{cavity_num}"
+                    try:
+                        # Read the worksheet
+                        df = pd.read_excel(file_path, sheet_name=sheet_name)
+
+                        # Extract the "Seq ID" column
+                        if "Seq ID" in df.columns:
+                            seq_ids = df["Seq ID"].dropna().astype(str).tolist()
+                            file_data[sheet_short_name] = seq_ids
+                            print(
+                                f"  Found {len(seq_ids)} seq IDs in {sheet_name} ({len(seq_ids)}, expected to be distinct)")
+                        else:
+                            print(f"  Warning: 'Seq ID' column not found in {sheet_name} of {filename}")
+                    except Exception as e:
+                        print(f"  Could not read {sheet_name} in {filename}: {e}")
+
 
             # Add the file's data to the main dictionary
             all_files_data[file_key] = file_data
@@ -79,11 +97,12 @@ def generate_multi_cav_pml(all_files_data, pdb_dir, output_dir):
     """
     # Define colors for each cavity
     cavity_colors = {
-        "cav_1": "red",
-        "cav_2": "orange",
-        "cav_3": "yellow",
-        "cav_4": "magenta",
-        "cav_5": "cyan"
+        "consensus" : "red",
+        "cav_1": "orange",
+        "cav_2": "yellow",
+        "cav_3": "cyan",
+        "cav_4": "blue",
+        "cav_5": "magenta"
     }
 
     # Ensure output directory exists
@@ -177,8 +196,8 @@ def prepare_for_pymol(input_directory, output_directory, copy_input=False):
             if filename.endswith('.xlsx') and filename.startswith(or_name):
                 xlsx_files.append(filename)
 
-        if len(xlsx_files) != 4:
-            print(f"  Warning: Expected 4 .xlsx files starting with '{or_name}' in {subdir_name}, found {len(xlsx_files)}")
+        if len(xlsx_files) != 5:
+            print(f"  Warning: Expected 5 .xlsx files (with consensus) starting with '{or_name}' in {subdir_name}, found {len(xlsx_files)}")
             continue
 
         # Step 3: Create output subdirectory
@@ -197,6 +216,7 @@ def prepare_for_pymol(input_directory, output_directory, copy_input=False):
                     shutil.copy2(src_path, dst_path)
 
         # Step 5: Read .xlsx files and generate PyMOL scripts
+        # Consensus file needs special treatment
         all_files_data = read_input_xlsx_files(subdir_path)
         generate_multi_cav_pml(all_files_data, subdir_path, output_subdir)
 

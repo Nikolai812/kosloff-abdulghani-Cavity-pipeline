@@ -14,6 +14,7 @@ if ($start_dir -ne $base_dir) {
 }
 
 # Define directories
+$predictions_input = Join-Path $base_dir "UI_SELENIUM\input"
 $predictions_output = Join-Path $base_dir "UI_SELENIUM\output"
 $pm_input           = Join-Path $base_dir "PYMOL_SCRIPTS\PM_INPUT"
 
@@ -23,6 +24,23 @@ Write-Host "To:"
 Write-Host "  $pm_input"
 
 robocopy $predictions_output $pm_input /E /XD *OLD* *temp* /R:0 /W:0
+
+
+# Get all .pdb files in the predictions input directory
+Get-ChildItem -Path $predictions_input -Filter "*.pdb" -File | ForEach-Object {
+    # Get the file name without extension
+    $fileNameOnly = $_.BaseName
+
+    # Create destination subdirectory under $pm_input
+    $destDir = Join-Path $pm_input $fileNameOnly
+    New-Item -ItemType Directory -Path $destDir -Force | Out-Null
+
+    # Copy the .pdb file into its corresponding subdirectory
+    Copy-Item -Path $_.FullName -Destination $destDir -Force
+
+    Write-Host "Copied $($_.Name) → $destDir"
+}
+
 
 #defining the 4 predictions output directory and
 
