@@ -148,7 +148,7 @@ def run_prankweb(pdb_input: str, config: SectionProxy):
         print(f"An error occurred: {e}")
     finally:
         # Close the browser
-        print("This is finally, going to quit driver")
+        print("Prank2Web finally, going to quit driver")
         driver.quit()
 
     only_unzip_and_process(pdb_input, config)

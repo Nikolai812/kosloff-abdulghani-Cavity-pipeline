@@ -335,7 +335,7 @@ def run_cavity_plus(pdb_input: str, config: SectionProxy):
 
     finally:
         # Close the browser
-        print("This is finally, going to quit driver")
+        print("CAVITYPLUS: finally quitting driver")
         driver.quit()
 
     print("Cavity Plus script completed")
