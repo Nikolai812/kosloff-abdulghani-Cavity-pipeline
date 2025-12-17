@@ -32,7 +32,7 @@ class ConsensusBuilder:
             return False
 
     @classmethod
-    def extract_seq_id_for_proper_cavity(cls, sub_path, strategy: StrategyName) ->dict[str,tuple[int,list[int]]]:
+    def extract_seq_id_for_proper_cavity(cls, sub_path, strategy: StrategyName) ->dict[str,tuple[int,list[int],list[str]]]:
         """
         Searches  for 4 .xlsx files:
         containing 'cspf', 'cvpl', 'p2rk', 'pupp' in filenames AND starting with the subdir name.
@@ -142,7 +142,8 @@ class ConsensusBuilder:
                 continue
 
             seq_ids = df.iloc[:, 2].dropna().tolist()
-            results[key] = (selected_cavity_number, seq_ids)
+            aa_names = df.iloc[:, 3].dropna().tolist()
+            results[key] = (selected_cavity_number, seq_ids, aa_names)
 
         return results
 
@@ -150,7 +151,7 @@ class ConsensusBuilder:
     @classmethod
     def write_consensus_file(cls,
                              sub: str,
-                             best_cavity_ids: dict[str, tuple[int, list[int]]],
+                             best_cavity_ids: dict[str, tuple[int, list[int], list[str]]],
                              output_dir: str) -> None:
         """
         Creates an Excel consensus file for the given subdirectory.
@@ -160,29 +161,44 @@ class ConsensusBuilder:
             Seq ID | cspf | cvpl | p2rk | pupp
         """
 
+        # Extract all (Seq ID, aa_name) tuples from all four prediction methods
+        all_tuples = set()
+
+        for method_key, (_, seq_list, aa_names) in best_cavity_ids.items():
+            # Assert that seq_list and aa_names have the same length
+            assert len(seq_list) == len(aa_names), \
+                f"Length mismatch in {method_key}: seq_list ({len(seq_list)}) and aa_names ({len(aa_names)})"
+
+            # Add tuples (seq_id, aa_name) to the set
+            all_tuples.update(zip(seq_list, aa_names))
+
+        # Sort the tuples by seq_id in ascending order
+        sorted_tuples = sorted(all_tuples, key=lambda x: x[0])
+
         # Extract all Seq ID values from all four prediction methods
-        all_ids = set()
-
-        for method_key, (_, seq_list) in best_cavity_ids.items():
-            all_ids.update(seq_list)
-
-        # Sort them ascending
-        sorted_ids = sorted(all_ids)
+        # all_ids = set()
+        #
+        # for method_key, (_, seq_list, aa_names) in best_cavity_ids.items():
+        #     all_ids.update(seq_list)
+        #
+        # # Sort them ascending (need to add aa_names)
+        # sorted_ids = sorted(all_ids)
 
         # Prepare table structure
         rows = []
-        for seq_id in sorted_ids:
-            cspf = 1 if seq_id in best_cavity_ids.get("cspf", (None, []))[1] else 0
-            cvpl = 1 if seq_id in best_cavity_ids.get("cvpl", (None, []))[1] else 0
-            p2rk = 1 if seq_id in best_cavity_ids.get("p2rk", (None, []))[1] else 0
-            pupp = 1 if seq_id in best_cavity_ids.get("pupp", (None, []))[1] else 0
+        for seq_tuple in sorted_tuples:
+            cspf = 1 if seq_tuple[0] in best_cavity_ids.get("cspf", (None, []))[1] else 0
+            cvpl = 1 if seq_tuple[0] in best_cavity_ids.get("cvpl", (None, []))[1] else 0
+            p2rk = 1 if seq_tuple[0] in best_cavity_ids.get("p2rk", (None, []))[1] else 0
+            pupp = 1 if seq_tuple[0] in best_cavity_ids.get("pupp", (None, []))[1] else 0
 
             # Consensus rule:
             # 1 if cspf=1 OR p2rk=1 OR (cvpl=1 AND pupp=1)
             consensus = 1 if (cspf == 1 or p2rk == 1 or (cvpl == 1 and pupp == 1)) else 0
 
             row = {
-                "Seq ID": seq_id,
+                "Seq ID": seq_tuple[0],
+                "AA": seq_tuple[1],
                 "cspf": cspf,
                 "cvpl": cvpl,
                 "p2rk": p2rk,
@@ -192,7 +208,7 @@ class ConsensusBuilder:
             rows.append(row)
 
         # Create DataFrame
-        df = pd.DataFrame(rows, columns=["Seq ID", "cspf", "cvpl", "p2rk", "pupp", "consensus"])
+        df = pd.DataFrame(rows, columns=["Seq ID","AA", "cspf", "cvpl", "p2rk", "pupp", "consensus"])
 
         # Create subdirectory inside output_dir
         sub_output_dir = os.path.join(output_dir, sub)
