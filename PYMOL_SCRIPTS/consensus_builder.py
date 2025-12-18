@@ -5,6 +5,9 @@ import stat
 
 from pandas import ExcelFile
 
+from PYMOL_SCRIPTS.score_handler import ScoreHandler
+import UI_SELENIUM.file_namer
+
 
 class StrategyName(Enum):
     FIRST = "first"
@@ -152,6 +155,7 @@ class ConsensusBuilder:
     def write_consensus_file(cls,
                              sub: str,
                              best_cavity_ids: dict[str, tuple[int, list[int], list[str]]],
+                             scores_map: dict[str, list[tuple[str, int, float]]],
                              output_dir: str) -> None:
         """
         Creates an Excel consensus file for the given subdirectory.
@@ -169,8 +173,11 @@ class ConsensusBuilder:
             assert len(seq_list) == len(aa_names), \
                 f"Length mismatch in {method_key}: seq_list ({len(seq_list)}) and aa_names ({len(aa_names)})"
 
+            # Need to find scores for sed_ids
+            score_values = ScoreHandler.get_scores_by_seq_ids(scores_map, sub, seq_list)
+
             # Add tuples (seq_id, aa_name) to the set
-            all_tuples.update(zip(seq_list, aa_names))
+            all_tuples.update(zip(seq_list, aa_names, score_values))
 
         # Sort the tuples by seq_id in ascending order
         sorted_tuples = sorted(all_tuples, key=lambda x: x[0])
@@ -199,6 +206,7 @@ class ConsensusBuilder:
             row = {
                 "Seq ID": seq_tuple[0],
                 "AA": seq_tuple[1],
+                "plddt": seq_tuple[2],
                 "cspf": cspf,
                 "cvpl": cvpl,
                 "p2rk": p2rk,
@@ -208,7 +216,7 @@ class ConsensusBuilder:
             rows.append(row)
 
         # Create DataFrame
-        df = pd.DataFrame(rows, columns=["Seq ID","AA", "cspf", "cvpl", "p2rk", "pupp", "consensus"])
+        df = pd.DataFrame(rows, columns=["Seq ID","AA", "plddt", "cspf", "cvpl", "p2rk", "pupp", "consensus"])
 
         # Create subdirectory inside output_dir
         sub_output_dir = os.path.join(output_dir, sub)
@@ -221,26 +229,32 @@ class ConsensusBuilder:
         print(f"Consensus file saved: {out_path}")
 
     @classmethod
-    def process_multi_or_folder(cls, input_dir, output_dir, best_cavity_strategy)->None:
+    def process_multi_or_folder(cls, sel_output_dir, pm_input_dir, best_cavity_strategy)->None:
         """
-        Scans 1st-level subdirectories of the input_dir (except containing 'temp' and 'OLD'), extracts best cavities ids,
-        Then constructs a consensus file according to the chosen strategy
+        Scans 1st-level subdirectories of the sel_output_dir (except containing 'temp' and 'OLD'), extracts best cavities ids,
+        Then constructs a consensus file according to the chosen strategy and writes it to pm_input_dir.
+        sel_output_dir works as an source (input) directory, pm_input_dir - as an output for consensus file
+        Nevertheless the scores from pdb files are being read (sourced) from the pm_input_dir
         """
 
+        # There might be several strategies to choose the best cavity (from the first 5 in 4 preriction methods)
         strategy=StrategyName(best_cavity_strategy)
 
+        # Creating an empty dictionary for each OR (.pdb file) to keep residue scores
+        pdb_aa_scores: dict[str, list[tuple[str, int, float]]] = {}
+
         # iterate over first-level subdirectories
-        for sub in os.listdir(input_dir):
-            sub_path = os.path.join(input_dir, sub)
+        for sub in os.listdir(sel_output_dir):
+            sub_path = os.path.join(sel_output_dir, sub)
             if not os.path.isdir(sub_path):
                 continue
             # skipping prankweb_temp and OLD_DATA folders
             if  'temp' in sub or 'OLD' in sub:
                 continue
 
-
+            ScoreHandler.collect_subdir_plddt(sub, pm_input_dir, pdb_aa_scores)
             best_cavity_ids = ConsensusBuilder.extract_seq_id_for_proper_cavity(sub_path, strategy)
-            ConsensusBuilder.write_consensus_file(sub, best_cavity_ids, output_dir)
+            ConsensusBuilder.write_consensus_file(sub, best_cavity_ids, pdb_aa_scores, pm_input_dir)
             print("")
 
 
