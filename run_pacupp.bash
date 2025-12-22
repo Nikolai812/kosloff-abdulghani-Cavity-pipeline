@@ -10,7 +10,8 @@ pacupp_spreadsheet_lists_dir="$pacupp_dir/output-files/spreadsheet-ready-lining-
 
 # CONFIGURATION: PDB files input directory, pacupp python feed up directory
 # (Normal place- inside the uh-cast-p-fold project.)
-pipeline_base="/mnt/c/Users/user/source/repos/uh-cast-p-fold"
+# pipeline_base="/mnt/c/Users/user/source/repos/uh-cast-p-fold"
+pipeline_base=$start_dir
 input_dir="$pipeline_base/UI_SELENIUM/input"
 pacupp_python_feedup="$pipeline_base/UI_SELENIUM/pacupp_python_feedup"
 # (input_dir="/mnt/c/Users/user/Ubuntu/INPUT_PDB")
