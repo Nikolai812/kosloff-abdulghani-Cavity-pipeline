@@ -1,3 +1,4 @@
+import argparse
 import configparser
 from configparser import SectionProxy
 
@@ -30,6 +31,8 @@ def load_config():
     # End of relative path update
 
     print(f"Configuration loaded from {config_path}, sections: {config.sections()} defaults: {config.defaults()}")
+    version=config['DEFAULT']['version']
+    print(f"########## CAVITY PIPELINE VERSION: {version}")
     return config['DEFAULT']
 
 
@@ -66,12 +69,48 @@ def run_4_predictions(pdb_files: list[str], config: SectionProxy) -> None:
         run_prankweb(pdb_file, config)
     pass
 
-
-if __name__ == '__main__':
+def main(rerun_prediction: str = None) -> None:
     print("Starting main.py script...")
     config = load_config()
     print(f"DEFAULT config: {config.items()}")
     input_dir = config['input_dir']
-    pdb_files= get_pdb_files(input_dir)
-    run_4_predictions(pdb_files, config)
+    pdb_files = get_pdb_files(input_dir)
+
+    if rerun_prediction is None:
+        run_4_predictions(pdb_files, config)
+    elif rerun_prediction == "cspf":
+        for pdb_file in pdb_files:
+            print(f'Re-Running only CASTpFold for {pdb_file}')
+            run_castpfold(pdb_file, config)
+    elif rerun_prediction == "cvpl":
+        for pdb_file in pdb_files:
+            print(f'Re-Running  only CavityPlus for {pdb_file}')
+            run_cavity_plus(pdb_file, config)
+    elif rerun_prediction == "p2rk":
+        for pdb_file in pdb_files:
+            print(f'Re-Running only PrankWeb for {pdb_file}')
+            run_prankweb(pdb_file, config)
+    elif rerun_prediction == "pupp":
+        print(f"Skipping web predictions. Only processing pacupp output files.")
+        pacupp_python_feedup = config['pacupp_python_feedup']
+        process_pupp_out_directory(pacupp_python_feedup, config)
+    else:
+        raise ValueError(f"Invalid --rerun-prediction option: {rerun_prediction}. Allowed values: cspf, cvpl, p2rk, pupp")
+
+
+
+if __name__ == '__main__':
+    # Set up command-line argument parsing
+    parser = argparse.ArgumentParser(description="Run predictions or reprocess specific steps.")
+    parser.add_argument(
+        "-r", "--rerun-prediction",
+        choices=["cspf", "cvpl", "p2rk", "pupp"],
+        help="Specify which prediction to rerun: cspf (CASTpFold), cvpl (CavityPlus), p2rk (PrankWeb), pupp (process pacupp output only)."
+    )
+    args = parser.parse_args()
+
+    # Call the main function with the parsed argument
+    main(args.rerun_prediction)
+
     print("End of main.py script...")
+
