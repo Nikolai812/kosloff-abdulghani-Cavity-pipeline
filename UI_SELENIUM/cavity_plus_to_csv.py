@@ -13,6 +13,11 @@ import time
 
 from file_namer import FileNamer, MethodType
 
+class CavityPlusUploadException(Exception):
+    """Custom exception for CavityPlus upload failures."""
+    pass
+
+
 def load_config():
     config = configparser.ConfigParser()
     config.read('config.ini')
@@ -39,11 +44,43 @@ def upload_and_submit_pdb(driver, pdb_file_path, pdb_input):
 
         # Upload the PDB file
         file_input.send_keys(pdb_file_path)
-        success_div_locator = (By.XPATH,
-                               "//input[@type='file' and @accept='pdb']/following-sibling::div[text()='Success.']")
-        submit_div = WebDriverWait(driver, 50).until(
-            EC.element_to_be_clickable(success_div_locator)
+        time.sleep(1)
+
+        # Single XPath locator for the input element inside a div with a data-* attribute
+        input_locator = (By.XPATH, "//label//div[contains(text(), '*.pdb, *.pdb.gz, *.cif, *.cif.gz')]/following-sibling::div[@class='upload']/input[@type='file' and @accept='pdb']")
+
+        # Wait for the input element to be present
+        input_element = WebDriverWait(driver, 15).until(
+            EC.presence_of_element_located(input_locator)
         )
+
+        max_attempts = 15
+        attempt = 0
+        status_text = ""
+
+        while attempt < max_attempts:
+            # Find the sibling div after the input element
+            success_div = input_element.find_element(By.XPATH, "./following-sibling::div")
+            status_text = success_div.text
+
+            # Print the status
+            print(f"Cavityplus upload pdb status: {status_text}")
+
+            # If status is "Success.", break the loop and continue
+            if status_text == "Success.":
+                print("Upload successful. Continuing the script...")
+                break
+            # If status is "Uploading", wait 1 second and poll again
+            elif "Uploading" in status_text:
+                time.sleep(1)
+                attempt += 1
+            # If status is something else, raise an exception immediately
+            else:
+                raise CavityPlusUploadException(f"Cavityplus upload failed with status: {status_text}")
+
+        # If the loop completes without "Success.", raise an exception
+        if status_text != "Success.":
+            raise CavityPlusUploadException(f"CavityPlus upload timed out after {max_attempts} attempts. Last status: {status_text}")
 
         print(f"Successfully uploaded the file: {pdb_input}")
         time.sleep(1)
@@ -294,6 +331,7 @@ def run_cavity_plus(pdb_input: str, config: SectionProxy):
     output_dir = config['output_dir']
     pocket_limit = int(config['pocket_limit'])
     pdb_name=os.path.splitext(pdb_input)[0]
+    print(f"Running Cavity plus processing to {pdb_input}")
 
     # Construct the full path to the PDB file
     pdb_file_path = os.path.abspath(os.path.join(input_dir, pdb_input))
@@ -315,23 +353,41 @@ def run_cavity_plus(pdb_input: str, config: SectionProxy):
     driver = webdriver.Chrome(service=service, options=chrome_options)
 
     try:
+        # Define the maximum number of upload attempts
+        maximal_upload_attempts = 4
+        print("Beginning upload attempts")
+
         # Open the CavityPlus URL
         driver.get(cavity_plus_url)
 
-        # Upload and submit the PDB file
-        upload_and_submit_pdb(driver, pdb_file_path, pdb_input)
+        # Attempt to upload and submit the PDB file
+        for attempt in range(1, maximal_upload_attempts + 1):
+            try:
+                # Upload and submit the PDB file
+                upload_and_submit_pdb(driver, pdb_file_path, pdb_input)
+                break  # Exit the loop if successful
+            except CavityPlusUploadException as e:
+                print(
+                    f"CavityPlusUploadException was thrown. Upload was unsuccessful. Attempt {attempt}/{maximal_upload_attempts}")
+                print(f"Error: {e}")
+                # Reload the CavityPlus URL
+                driver.get(cavity_plus_url)
+                if attempt == maximal_upload_attempts:
+                    print(f"Maximal number of upload attempts ({maximal_upload_attempts}) reached. Giving up.")
+                    raise  # Re-raise the exception if all attempts fail
 
+    
         # Wait for the Download results button to appear and become clickable
         download_button_locator = (By.CSS_SELECTOR, "button.btn.btn-link b")
         download_button = WebDriverWait(driver, 300).until(
             EC.element_to_be_clickable(download_button_locator)
         )
-        print("Download results button is now visible and clickable")
+        print("CVPL: Download results button is now visible and clickable")
 
         write_cavity_results(driver, pdb_name, output_dir, pocket_limit=pocket_limit)
 
     except Exception as e:
-        print(f"An error occurred: {e}")
+        print(f"CVPL: An error occurred: {e}")
 
     finally:
         # Close the browser
