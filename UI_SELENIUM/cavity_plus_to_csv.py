@@ -376,7 +376,7 @@ def run_cavity_plus(pdb_input: str, config: SectionProxy):
                     print(f"Maximal number of upload attempts ({maximal_upload_attempts}) reached. Giving up.")
                     raise  # Re-raise the exception if all attempts fail
 
-    
+
         # Wait for the Download results button to appear and become clickable
         download_button_locator = (By.CSS_SELECTOR, "button.btn.btn-link b")
         download_button = WebDriverWait(driver, 300).until(
