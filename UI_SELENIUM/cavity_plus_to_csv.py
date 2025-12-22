@@ -372,6 +372,8 @@ def run_cavity_plus(pdb_input: str, config: SectionProxy):
                 print(f"Error: {e}")
                 # Reload the CavityPlus URL
                 driver.get(cavity_plus_url)
+                driver.execute_script("location.reload(true);")
+                time.sleep(1)
                 if attempt == maximal_upload_attempts:
                     print(f"Maximal number of upload attempts ({maximal_upload_attempts}) reached. Giving up.")
                     raise  # Re-raise the exception if all attempts fail

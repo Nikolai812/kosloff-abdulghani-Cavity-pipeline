@@ -5,8 +5,9 @@ import stat
 
 from pandas import ExcelFile
 
-from PYMOL_SCRIPTS.score_handler import ScoreHandler
-import UI_SELENIUM.file_namer
+#from PYMOL_SCRIPTS.score_handler import ScoreHandler
+from score_handler import ScoreHandler
+
 
 
 class StrategyName(Enum):
