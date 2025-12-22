@@ -4,7 +4,7 @@ $base_dir = "C:\Users\user\source\repos\uh-cast-p-fold"
 # Get current directory as a STRING
 $start_dir = (Get-Location).Path
 
-Write-Host "Starting rerun only cavity plus predictions from directory: $start_dir"
+Write-Host "Starting rerun only Cast-p-Fold plus predictions from directory: $start_dir"
 
 # Verify the script is run from the expected directory
 if ($start_dir -ne $base_dir) {
@@ -15,6 +15,6 @@ if ($start_dir -ne $base_dir) {
 
 
 python .\UI_SELENIUM\main.py --rerun-prediction=cspf
-Write-Output "only cavity plus .ps1 script completed"
+Write-Output "only castfold plus .ps1 script completed"
 
 
