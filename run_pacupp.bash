@@ -75,6 +75,7 @@ done
 
 # Exit the script 
 echo "Copying pacupp spreadsheet lists from  $pacupp_spreadsheet_lists_dir to $pacupp_python_feedup (with force overwrite)"
+mkdir -p "$pacupp_python_feedup"
 cp -f "$pacupp_spreadsheet_lists_dir"/*.txt "$pacupp_python_feedup"/
 
 
