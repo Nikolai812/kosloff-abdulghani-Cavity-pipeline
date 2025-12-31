@@ -5,7 +5,7 @@ start_dir=$(pwd)
 echo "Starting directory: $start_dir"
 
 #CONFIGURATION: Pacupp script and output directories
-pacupp_dir="/mnt/c/Users/user/Ubuntu/app/pacupp/Fill_Cavities_PACUPP"
+pacupp_dir="/mnt/c/pipeline/JPipeline_PACUPP/Fill_Cavities_PACUPP"
 pacupp_spreadsheet_lists_dir="$pacupp_dir/output-files/spreadsheet-ready-lining-lists"
 
 # CONFIGURATION: PDB files input directory, pacupp python feed up directory

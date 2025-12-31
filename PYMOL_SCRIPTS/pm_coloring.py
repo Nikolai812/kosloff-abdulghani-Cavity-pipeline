@@ -120,11 +120,15 @@ def generate_multi_cav_pml(all_files_data, pdb_dir, output_dir):
         png_path = os.path.join(output_dir, f"{file_key}.png")
         pse_path = os.path.join(output_dir, f"{file_key}.pse")
 
+        script_path = os.path.abspath(__file__)
+        output_dir_path = os.path.join(script_path, output_dir)
+
         print(f"Generating PyMOL script for {file_key}...")
 
         # Write the .pml script
         with open(pml_path, 'w') as f:
-            f.write(f"load {pdb_base}.pdb\n") #f.write(f"load {pdb_file}\n")
+            f.write(f"cd {output_dir_path}\n")
+            f.write(f"load {pdb_base}.pdb\n")
 
             # Create selections and color them for each cavity
             for cav_name, seq_ids in cavities.items():
@@ -135,10 +139,10 @@ def generate_multi_cav_pml(all_files_data, pdb_dir, output_dir):
                     f.write(f"color {cavity_colors[cav_name]}, {cav_name}\n")
 
             # Save the session and image
-            f.write(f"save {file_key}.pse\n")  #f.write(f"save {pse_path}\n")
+            f.write(f"save {file_key}.pse\n")
             f.write("ray 800, 600\n")
-            f.write(f"png {file_key}.png\n")    # f.write(f"png {png_path}\n")
-            f.write("quit\n")
+            # f.write(f"png {file_key}.png\n")  # png file looks not needed any more
+            # f.write("quit\n")
 
         print(f"  Generated {pml_path}")
         print(f"  Output files: {pse_path}, {png_path}")
