@@ -1,6 +1,10 @@
 
 from pathlib import Path
-import warnings
+import logging
+# import warnings
+from pymol_scripts_exception import PymolScriptsException
+
+logger = logging.getLogger(__name__)
 
 class ScoreHandler:
 
@@ -45,7 +49,9 @@ class ScoreHandler:
         """
 
         sub_path = Path(pm_input) / sub
-        assert sub_path.is_dir(), f"{sub_path} is not a directory"
+        if not sub_path.is_dir():
+            raise PymolScriptsException(f"{sub_path} is not a directory")
+
 
         # Expected PDB filename
         expected_pdb = sub_path / f"{sub_path.name}.pdb"
@@ -53,22 +59,21 @@ class ScoreHandler:
         # Find all PDB files in directory
         pdb_files = list(sub_path.glob("*.pdb"))
 
-        assert len(pdb_files) == 1, (
-            f"Expected exactly one .pdb file in {sub_path}, "
-            f"found {len(pdb_files)}"
-        )
+        if not (len(pdb_files) == 1):
+            raise PymolScriptsException(f"Expected exactly one .pdb file in {sub_path}, "
+            f"found {len(pdb_files)}")
 
-        assert pdb_files[0] == expected_pdb, (
-            f"Expected PDB file named {expected_pdb.name}, "
+
+        if not (pdb_files[0] == expected_pdb):
+            raise PymolScriptsException(f"Expected PDB file named {expected_pdb.name}, "
             f"found {pdb_files[0].name}"
         )
 
+
         # Warn if overwriting existing key
         if str(sub_path) in pdb_aa_scores:
-            warnings.warn(
-                f"Key '{sub_path}' exists in pdb_aa_scores; reassigning",
-                UserWarning
-            )
+            logger.warning(f"Key '{sub_path}' exists in pdb_aa_scores; reassigning")
+
 
         # Extract scores and store
         rows = cls.extract_plddt_by_residue(expected_pdb)
@@ -109,10 +114,7 @@ class ScoreHandler:
             residue = int(residue)
 
             if residue in score_map:
-                warnings.warn(
-                    f"Duplicate score found for residue {residue}, or name {sub}, skipping it",
-                    UserWarning
-                )
+                logger.warning(f"Duplicate score found for residue {residue}, or name {sub}, skipping it")
                 continue
 
             score_map[residue] = score
@@ -122,10 +124,7 @@ class ScoreHandler:
 
         for seq_id in seq_ids:
             if seq_id not in score_map:
-                warnings.warn(
-                    f"Sequence ID {seq_id} not found in pdb_aa_scores, or name {sub}, assigning 0 value and continuing",
-                    UserWarning
-                )
+                logger.warning(f"Sequence ID {seq_id} not found in pdb_aa_scores, or name {sub}, assigning 0 value and continuing")
                 scores.append(0.0)
 
             scores.append(score_map[seq_id])

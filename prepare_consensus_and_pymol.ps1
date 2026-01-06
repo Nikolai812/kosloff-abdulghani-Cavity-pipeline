@@ -25,6 +25,18 @@ Write-Host "  $predictions_output"
 Write-Host "To:"
 Write-Host "  $pm_input"
 
+# Check if the PM_INPUT directory exists
+if (Test-Path $pm_input) {
+    # Check if the directory is not empty
+    if ((Get-ChildItem -Path $pm_input -Recurse -Force).Count -gt 0) {
+        Write-Warning "Directory '$pm_input' exists and is not empty. Clearing all files..."
+        # Delete all files in the directory
+        Get-ChildItem -Path $pm_input -Recurse -Force | Remove-Item -Force -Recurse
+    } else {
+        Write-Host "Directory '$pm_input' exists and is empty. No action taken."
+    }
+}
+
 robocopy $predictions_output $pm_input /E /XD *OLD* *temp* /R:0 /W:0
 
 

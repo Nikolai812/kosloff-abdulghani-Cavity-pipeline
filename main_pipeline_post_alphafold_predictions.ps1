@@ -35,6 +35,18 @@ Write-Output "Defined predictions input dir $predictions_input"
 Write-Output "Defined predictions output dir $predictions_output"
 Write-Output "Defined pymol preparations input dir $pm_input"
 
+# Check if the PM_INPUT directory exists
+if (Test-Path $pm_input) {
+    # Check if the directory is not empty
+    if ((Get-ChildItem -Path $pm_input -Recurse -Force).Count -gt 0) {
+        Write-Warning "Directory '$pm_input' exists and is not empty. Clearing all files..."
+        # Delete all files in the directory
+        Get-ChildItem -Path $pm_input -Recurse -Force | Remove-Item -Force -Recurse
+    } else {
+        Write-Host "Directory '$pm_input' exists and is empty. No action taken."
+    }
+}
+
 Write-Host "Copying from:"
 Write-Host "  $predictions_output"
 Write-Host "To:"

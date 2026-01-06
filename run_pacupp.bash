@@ -24,6 +24,12 @@ echo "input_dir=$input_dir"
 echo "pacupp_python_feedup=$pacupp_python_feedup"
 echo "!!!!!!!!!!!"
 echo "   "
+echo "   "
+echo "--------Beginning with previous results cleaning---------"
+echo "+++++++ Cleaning the pacupp_spreadsheet_lists_dir: $pacupp_spreadsheet_lists_dir"
+rm -f "$pacupp_spreadsheet_lists_dir"/*
+echo "+++++++ Cleaning the pacupp_python_feedup: $pacupp_python_feedup"
+rm "$pacupp_python_feedup"/*
 
 # List all .pdb files in the input directory
 echo "Listing .pdb files in $input_dir:"

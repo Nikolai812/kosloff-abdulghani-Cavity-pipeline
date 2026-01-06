@@ -1,14 +1,16 @@
 from enum import Enum
 import os
 import pandas as pd
+from pandas import ExcelFile
+import logging
 import stat
 
-from pandas import ExcelFile
 
-#from PYMOL_SCRIPTS.score_handler import ScoreHandler
+from pymol_scripts_exception import PymolScriptsException
 from score_handler import ScoreHandler
 
 
+logger = logging.getLogger(__name__)
 
 class StrategyName(Enum):
     FIRST = "first"
@@ -101,13 +103,15 @@ class ConsensusBuilder:
             for key in required_keys:
                 if key in lower:
                     files_found[key] = fpath
+                else:
+                    #print(f"{key} file for ORname {fname} is missing, consensus cannot be built ")
+                    logger.warning(f"{key} file for ORname {fname} is missing, consensus cannot be built ")
 
 
         # process each of the 4 files
         for key, fpath in files_found.items():
             if fpath == '':
-                print(f"Warning: Missing required file containing '{key}' in {sub_path}")
-                continue
+                raise PymolScriptsException(f"Missing required file containing '{key}' in {sub_path}, not all files provided, cannot build consensus")
 
             xls = pd.ExcelFile(fpath)
             selected_sheet = None
@@ -132,17 +136,17 @@ class ConsensusBuilder:
                 selected_cavity_number = 1
 
             if selected_sheet is None:
-                print(f"Warning: No Cavity sheets found in {fpath}")
+                logger.warning(f"No Cavity sheets found in {fpath}")
                 continue
 
             if selected_sheet != "Cavity 1":
-                print(f"Warning: {fpath} used '{selected_sheet}' instead of 'Cavity 1'")
+                logger.warning(f": {fpath} used '{selected_sheet}' instead of 'Cavity 1'")
 
             # extract 3rd column ('Seq ID')
             df = xls.parse(selected_sheet)
 
             if df.shape[1] < 3:
-                print(f"Warning: File {fpath}, sheet {selected_sheet} has fewer than 3 columns")
+                logger.warning(f"Warning: File {fpath}, sheet {selected_sheet} has fewer than 3 columns")
                 continue
 
             seq_ids = df.iloc[:, 2].dropna().tolist()
@@ -183,15 +187,6 @@ class ConsensusBuilder:
         # Sort the tuples by seq_id in ascending order
         sorted_tuples = sorted(all_tuples, key=lambda x: x[0])
 
-        # Extract all Seq ID values from all four prediction methods
-        # all_ids = set()
-        #
-        # for method_key, (_, seq_list, aa_names) in best_cavity_ids.items():
-        #     all_ids.update(seq_list)
-        #
-        # # Sort them ascending (need to add aa_names)
-        # sorted_ids = sorted(all_ids)
-
         # Prepare table structure
         rows = []
         for seq_tuple in sorted_tuples:
@@ -227,12 +222,12 @@ class ConsensusBuilder:
         out_path = os.path.join(sub_output_dir, f"{sub}_consensus.xlsx")
         df.to_excel(out_path, index=False)
 
-        print(f"Consensus file saved: {out_path}")
+        logger.info(f"Consensus file saved: {out_path}")
 
     @classmethod
     def process_multi_or_folder(cls, sel_output_dir, pm_input_dir, best_cavity_strategy)->None:
         """
-        Scans 1st-level subdirectories of the sel_output_dir (except containing 'temp' and 'OLD'), extracts best cavities ids,
+        Scans 1st-level subdirectories of the Selenium Output: sel_output_dir (except containing 'temp' and 'OLD'), extracts best cavities ids,
         Then constructs a consensus file according to the chosen strategy and writes it to pm_input_dir.
         sel_output_dir works as an source (input) directory, pm_input_dir - as an output for consensus file
         Nevertheless the scores from pdb files are being read (sourced) from the pm_input_dir
