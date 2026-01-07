@@ -1,6 +1,8 @@
 import argparse
 import configparser
 from configparser import SectionProxy
+from datetime import datetime
+import logging
 
 from castpfold_to_csv import run_castpfold
 from cavity_plus_to_csv import run_cavity_plus
@@ -30,9 +32,9 @@ def load_config():
     config['DEFAULT']['prankweb_temp'] = os.path.join(script_dir, config['DEFAULT']['prankweb_temp'])
     # End of relative path update
 
-    print(f"Configuration loaded from {config_path}, sections: {config.sections()} defaults: {config.defaults()}")
+    logging.info(f"Configuration loaded from {config_path}, sections: {config.sections()} defaults: {config.defaults()}")
     version=config['DEFAULT']['version']
-    print(f"########## CAVITY PIPELINE VERSION: {version}")
+    logging.info(f"########## CAVITY PIPELINE VERSION: {version}")
     return config['DEFAULT']
 
 
@@ -56,23 +58,45 @@ def run_4_predictions(pdb_files: list[str], config: SectionProxy) -> None:
     # Processing output files of pacupp JMOL script
     # It is expected, that java JMOL pacupp has been run prior to this python script
 
-    print(f"Expecting that java pacupp has already completed. Processing pacupp output files for {pdb_files} ")
+    logging.info(f"Expecting that java pacupp has already completed. Processing pacupp output files for {pdb_files}  at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     pacupp_python_feedup = config['pacupp_python_feedup']
     process_pupp_out_directory(pacupp_python_feedup, config)
 
     #raise Exception("Temporary stop")
 
     for pdb_file in pdb_files:
-        print(f'Running 4 predictions for {pdb_file}')
+        logging.info("")
+        logging.info("++++++++++++++++++++++++++++++++++++++++++++++++++++++++")
+        logging.info("++++++++++++++++++++++++++++++++++++++++++++++++++++++++")
+        logging.info(f'Running 4 predictions for {pdb_file}')
+        logging.info(f"Starting CastPFold for {pdb_file} at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
         run_castpfold(pdb_file, config)
+
+        logging.info(f"Starting CavityPlus for {pdb_file} at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
         run_cavity_plus(pdb_file, config)
+        logging.info(f"Starting PrankWev for {pdb_file} at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
         run_prankweb(pdb_file, config)
+        logging.info(f"Completing 4predictions for {pdb_file} at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        logging.info("++++++++++++++++++++++++++++++++++++++++++++++++++++++++")
+        logging.info("++++++++++++++++++++++++++++++++++++++++++++++++++++++++")
     pass
 
 def main(rerun_prediction: str = None) -> None:
-    print("Starting main.py script...")
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(levelname)s: %(message)s',
+        handlers=[
+            logging.StreamHandler(),  # Log to console
+            logging.FileHandler('ui_selenium.log')  # Uncomment to log to a file
+        ]
+    )
+
+    # Set a specific logger for the project
+    logger = logging.getLogger(__name__)
+
+    logging.info(f"Starting main.py script... at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     config = load_config()
-    print(f"DEFAULT config: {config.items()}")
+    logging.info(f"DEFAULT config: {config.items()}")
     input_dir = config['input_dir']
     pdb_files = get_pdb_files(input_dir)
 
@@ -80,18 +104,18 @@ def main(rerun_prediction: str = None) -> None:
         run_4_predictions(pdb_files, config)
     elif rerun_prediction == "cspf":
         for pdb_file in pdb_files:
-            print(f'Re-Running only CASTpFold for {pdb_file}')
+            logging.info(f'Re-Running only CASTpFold for {pdb_file} at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}')
             run_castpfold(pdb_file, config)
     elif rerun_prediction == "cvpl":
         for pdb_file in pdb_files:
-            print(f'Re-Running  only CavityPlus for {pdb_file}')
+            logging.info(f'Re-Running  only CavityPlus for {pdb_file} at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}')
             run_cavity_plus(pdb_file, config)
     elif rerun_prediction == "p2rk":
         for pdb_file in pdb_files:
-            print(f'Re-Running only PrankWeb for {pdb_file}')
+            logging.info(f'Re-Running only PrankWeb for {pdb_file} at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}')
             run_prankweb(pdb_file, config)
     elif rerun_prediction == "pupp":
-        print(f"Skipping web predictions. Only processing pacupp output files.")
+        logging.info(f"Skipping web predictions. Only processing pacupp output files. at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
         pacupp_python_feedup = config['pacupp_python_feedup']
         process_pupp_out_directory(pacupp_python_feedup, config)
     else:
@@ -112,5 +136,5 @@ if __name__ == '__main__':
     # Call the main function with the parsed argument
     main(args.rerun_prediction)
 
-    print("End of main.py script...")
+    print(f"End of main.py script... at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 

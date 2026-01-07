@@ -42,7 +42,7 @@ def read_input_xlsx_files(directory):
         # Process only .xlsx files including consensus
         file_key = filename.split('_residues')[0] if 'consensus' not in filename else filename.split('.')[0] #filename.split('_consensus')[0]
         if filename.endswith('.xlsx'):
-            logger.info(f"Processing file: {filename}")
+            logger.info(f"Reading data from (excel) file: {filename}")
 
             # Initialize the dictionary for this file's cavities
             file_data = {}
@@ -120,7 +120,7 @@ def generate_multi_cav_pml(all_files_data, pdb_dir, output_dir):
 
         # Generate paths for output files
         pml_path = os.path.join(output_dir, f"{file_key}.pml")
-        png_path = os.path.join(output_dir, f"{file_key}.png")
+        # png_path = os.path.join(output_dir, f"{file_key}.png")
         pse_path = os.path.join(output_dir, f"{file_key}.pse")
 
         script_path = os.path.abspath(__file__)
@@ -147,8 +147,8 @@ def generate_multi_cav_pml(all_files_data, pdb_dir, output_dir):
             # f.write(f"png {file_key}.png\n")  # png file looks not needed any more
             # f.write("quit\n")
 
-        logger.info(f"  Generated {pml_path}")
-        logger.info(f"  Output files: {pse_path}, {png_path}")
+        logger.info(f"  Generated script {pml_path}")
+        logger.info(f"  PyMol session file: {pse_path}")
 
 
 def prepare_for_pymol(input_directory, output_directory, copy_input=False):
@@ -172,7 +172,7 @@ def prepare_for_pymol(input_directory, output_directory, copy_input=False):
         if not os.path.isdir(subdir_path):
             continue
 
-        logger.info(f"\nProcessing subdirectory: {subdir_name}")
+        logger.info(f"\nPymol script preparation: Processing subdirectory: {subdir_name}")
 
         # Step 1: Verify .pdb file
         pdb_files = [f for f in os.listdir(subdir_path) if f.endswith('.pdb')]
@@ -231,7 +231,7 @@ def prepare_for_pymol(input_directory, output_directory, copy_input=False):
         all_files_data = read_input_xlsx_files(subdir_path)
         generate_multi_cav_pml(all_files_data, subdir_path, output_subdir)
 
-        logger.info(f"Pymol script preparation completed for {subdir_name}")
+        logger.info(f"Pymol script preparation: Completed for {subdir_name}")
 
 
 def main():

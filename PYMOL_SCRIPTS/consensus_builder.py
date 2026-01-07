@@ -1,7 +1,9 @@
 from enum import Enum
+from datetime import datetime
 import os
 import pandas as pd
 from pandas import ExcelFile
+from pathlib import Path
 import logging
 import stat
 
@@ -222,7 +224,7 @@ class ConsensusBuilder:
         out_path = os.path.join(sub_output_dir, f"{sub}_consensus.xlsx")
         df.to_excel(out_path, index=False)
 
-        logger.info(f"Consensus file saved: {out_path}")
+        logger.info(f"Consensus file saved: {out_path} at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
     @classmethod
     def process_multi_or_folder(cls, sel_output_dir, pm_input_dir, best_cavity_strategy)->None:
@@ -247,6 +249,28 @@ class ConsensusBuilder:
             # skipping prankweb_temp and OLD_DATA folders
             if  'temp' in sub or 'OLD' in sub:
                 continue
+
+            sub_path = Path(pm_input_dir) / sub
+            if not sub_path.is_dir():
+                raise PymolScriptsException(f"{sub_path} is not a directory at {pm_input_dir}")
+
+            # Expected PDB filename
+            expected_pdb = sub_path / f"{sub_path.name}.pdb"
+
+            # Find all PDB files in directory
+            pdb_files = list(sub_path.glob("*.pdb"))
+
+            if not (len(pdb_files) == 1):
+                logger.warning(f"Expected exactly one .pdb file in {sub_path}, "
+                                            f"found {len(pdb_files)}, skipping the {sub_path.name}")
+                continue
+
+            if not (pdb_files[0] == expected_pdb):
+                logger.warning(f"Expected PDB file named {expected_pdb.name}, "
+                                            f"found {pdb_files[0].name}"
+                                            )
+                continue
+
 
             ScoreHandler.collect_subdir_plddt(sub, pm_input_dir, pdb_aa_scores)
             best_cavity_ids = ConsensusBuilder.extract_seq_id_for_proper_cavity(sub_path, strategy)

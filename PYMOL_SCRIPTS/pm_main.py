@@ -57,9 +57,10 @@ def main():
         traceback.print_exc()  # Print the full traceback
 
     # 2. Preparing coloring scripts for PyMol
+    logger.info(f"Starting task: PyMol script preparation for {pm_input_dir}.")
     prepare_for_pymol(pm_input_dir, pm_output_dir, copy_input=True)
     logger.info(
-        f"Completed task: consensus building and PyMol script preparation to {pm_output_dir}, exiting at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        f"Completed task:  PyMol script preparation to {pm_output_dir}, exiting at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
 if __name__ == "__main__":
     main()

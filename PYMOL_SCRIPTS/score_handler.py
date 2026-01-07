@@ -47,28 +47,28 @@ class ScoreHandler:
         pdb_aa_scores : dict
             Mapping sub_path -> list of (chain, residue, plddt)
         """
-
+        ##################
         sub_path = Path(pm_input) / sub
-        if not sub_path.is_dir():
-            raise PymolScriptsException(f"{sub_path} is not a directory")
+        #if not sub_path.is_dir():
+        #    raise PymolScriptsException(f"{sub_path} is not a directory")
 
 
         # Expected PDB filename
         expected_pdb = sub_path / f"{sub_path.name}.pdb"
 
         # Find all PDB files in directory
-        pdb_files = list(sub_path.glob("*.pdb"))
+        # pdb_files = list(sub_path.glob("*.pdb"))
 
-        if not (len(pdb_files) == 1):
-            raise PymolScriptsException(f"Expected exactly one .pdb file in {sub_path}, "
-            f"found {len(pdb_files)}")
+        #if not (len(pdb_files) == 1):
+        #    raise PymolScriptsException(f"Expected exactly one .pdb file in {sub_path}, "
+        #    f"found {len(pdb_files)}")
 
 
-        if not (pdb_files[0] == expected_pdb):
-            raise PymolScriptsException(f"Expected PDB file named {expected_pdb.name}, "
-            f"found {pdb_files[0].name}"
-        )
-
+        #if not (pdb_files[0] == expected_pdb):
+        #    raise PymolScriptsException(f"Expected PDB file named {expected_pdb.name}, "
+        #    f"found {pdb_files[0].name}"
+        #)
+        #####################
 
         # Warn if overwriting existing key
         if str(sub_path) in pdb_aa_scores:
