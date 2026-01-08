@@ -9,13 +9,10 @@ from cavity_plus_to_csv import run_cavity_plus
 from prankweb_to_csv import run_prankweb
 from pupp_out_to_csv import  process_pupp_out_directory
 
-
 import os
 
-def load_config0():
-    config = configparser.ConfigParser()
-    config.read('config.ini')
-    return config['DEFAULT']
+# Set a specific logger for the project
+logger = logging.getLogger(__name__)
 
 
 def load_config():
@@ -58,27 +55,27 @@ def run_4_predictions(pdb_files: list[str], config: SectionProxy) -> None:
     # Processing output files of pacupp JMOL script
     # It is expected, that java JMOL pacupp has been run prior to this python script
 
-    logging.info(f"Expecting that java pacupp has already completed. Processing pacupp output files for {pdb_files}  at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    logger.info(f"Expecting that java pacupp has already completed. Processing pacupp output files for {pdb_files}  at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     pacupp_python_feedup = config['pacupp_python_feedup']
     process_pupp_out_directory(pacupp_python_feedup, config)
 
     #raise Exception("Temporary stop")
 
     for pdb_file in pdb_files:
-        logging.info("")
-        logging.info("++++++++++++++++++++++++++++++++++++++++++++++++++++++++")
-        logging.info("++++++++++++++++++++++++++++++++++++++++++++++++++++++++")
-        logging.info(f'Running 4 predictions for {pdb_file}')
-        logging.info(f"Starting CastPFold for {pdb_file} at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        logger.info("")
+        logger.info("++++++++++++++++++++++++++++++++++++++++++++++++++++++++")
+        logger.info("++++++++++++++++++++++++++++++++++++++++++++++++++++++++")
+        logger.info(f'Running 4 predictions for {pdb_file}')
+        logger.info(f"Starting CastPFold for {pdb_file} at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
         run_castpfold(pdb_file, config)
 
-        logging.info(f"Starting CavityPlus for {pdb_file} at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        logger.info(f"Starting CavityPlus for {pdb_file} at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
         run_cavity_plus(pdb_file, config)
-        logging.info(f"Starting PrankWev for {pdb_file} at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        logger.info(f"Starting PrankWev for {pdb_file} at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
         run_prankweb(pdb_file, config)
-        logging.info(f"Completing 4predictions for {pdb_file} at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-        logging.info("++++++++++++++++++++++++++++++++++++++++++++++++++++++++")
-        logging.info("++++++++++++++++++++++++++++++++++++++++++++++++++++++++")
+        logger.info(f"Completing 4predictions for {pdb_file} at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        logger.info("++++++++++++++++++++++++++++++++++++++++++++++++++++++++")
+        logger.info("++++++++++++++++++++++++++++++++++++++++++++++++++++++++")
     pass
 
 def main(rerun_prediction: str = None) -> None:
@@ -91,10 +88,7 @@ def main(rerun_prediction: str = None) -> None:
         ]
     )
 
-    # Set a specific logger for the project
-    logger = logging.getLogger(__name__)
-
-    logging.info(f"Starting main.py script... at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    logger.info(f"Starting main.py script... at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     config = load_config()
     logging.info(f"DEFAULT config: {config.items()}")
     input_dir = config['input_dir']
@@ -104,18 +98,18 @@ def main(rerun_prediction: str = None) -> None:
         run_4_predictions(pdb_files, config)
     elif rerun_prediction == "cspf":
         for pdb_file in pdb_files:
-            logging.info(f'Re-Running only CASTpFold for {pdb_file} at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}')
+            logger.info(f'Re-Running only CASTpFold for {pdb_file} at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}')
             run_castpfold(pdb_file, config)
     elif rerun_prediction == "cvpl":
         for pdb_file in pdb_files:
-            logging.info(f'Re-Running  only CavityPlus for {pdb_file} at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}')
+            logger.info(f'Re-Running  only CavityPlus for {pdb_file} at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}')
             run_cavity_plus(pdb_file, config)
     elif rerun_prediction == "p2rk":
         for pdb_file in pdb_files:
-            logging.info(f'Re-Running only PrankWeb for {pdb_file} at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}')
+            logger.info(f'Re-Running only PrankWeb for {pdb_file} at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}')
             run_prankweb(pdb_file, config)
     elif rerun_prediction == "pupp":
-        logging.info(f"Skipping web predictions. Only processing pacupp output files. at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        logger.info(f"Skipping web predictions. Only processing pacupp output files. at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
         pacupp_python_feedup = config['pacupp_python_feedup']
         process_pupp_out_directory(pacupp_python_feedup, config)
     else:

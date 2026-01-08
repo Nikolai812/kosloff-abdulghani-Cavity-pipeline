@@ -3,6 +3,9 @@ import os
 import configparser
 from configparser import SectionProxy
 
+from datetime import datetime
+import logging
+
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait, Select
@@ -12,6 +15,8 @@ from selenium.webdriver.chrome.options import Options
 import time
 
 from file_namer import FileNamer, MethodType
+
+logger = logging.getLogger(__name__)
 
 class CavityPlusUploadException(Exception):
     """Custom exception for CavityPlus upload failures."""
@@ -64,11 +69,11 @@ def upload_and_submit_pdb(driver, pdb_file_path, pdb_input):
             status_text = success_div.text
 
             # Print the status
-            print(f"Cavityplus upload pdb status: {status_text}")
+            logger.info(f"Cavityplus upload pdb status: {status_text} at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
             # If status is "Success.", break the loop and continue
             if status_text == "Success.":
-                print("Upload successful. Continuing the script...")
+                logger.info(f"Upload successful. Continuing the script... at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
                 break
             # If status is "Uploading", wait 1 second and poll again
             elif "Uploading" in status_text:
@@ -76,13 +81,13 @@ def upload_and_submit_pdb(driver, pdb_file_path, pdb_input):
                 attempt += 1
             # If status is something else, raise an exception immediately
             else:
-                raise CavityPlusUploadException(f"Cavityplus upload failed with status: {status_text}")
+                raise CavityPlusUploadException(f"Cavityplus upload failed with status: {status_text} at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
         # If the loop completes without "Success.", raise an exception
         if status_text != "Success.":
             raise CavityPlusUploadException(f"CavityPlus upload timed out after {max_attempts} attempts. Last status: {status_text}")
 
-        print(f"Successfully uploaded the file: {pdb_input}")
+        logger.info(f"Successfully uploaded the file: {pdb_input} at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
         time.sleep(1)
 
         # Wait for the Submit button to be clickable
@@ -96,10 +101,10 @@ def upload_and_submit_pdb(driver, pdb_file_path, pdb_input):
         WebDriverWait(driver, 10).until(EC.element_to_be_clickable(submit_button))
         # Use JavaScript to click the submit button
         driver.execute_script("arguments[0].click();", submit_button)
-        print("Successfully clicked the Submit button")
+        logger.info(f"Successfully clicked the Submit button at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
     except Exception as e:
-        print(f"An error occurred during upload and submit: {e}")
+        logger.error(f"An error occurred during upload and submit: {e} at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
         raise
 
 
@@ -125,13 +130,11 @@ def prepare_cavity_tables(driver, pocket_limit=-1):
         # Apply pocket limit if specified
         if pocket_limit > 0:
             if pocket_limit > total_rows:
-                print(
-                    f"WARNING: pocket_limit={pocket_limit} exceeds total cavities ({total_rows}). "
-                    f"Processing all available cavities instead."
-                )
+                logger.warning(f"WARNING: pocket_limit={pocket_limit} exceeds total cavities ({total_rows}). ")
+                logger.info(f"Processing all available cavities instead.")
                 rows_to_process = rows
             else:
-                print(f"Applying pocket limit: processing first {pocket_limit} cavities.")
+                logger.info(f"Applying pocket limit: processing first {pocket_limit} cavities.")
                 rows_to_process = rows[:pocket_limit]
         else:
             rows_to_process = rows
@@ -142,7 +145,7 @@ def prepare_cavity_tables(driver, pocket_limit=-1):
 
         # Iterate over rows
         for cavity_index, row in enumerate(rows_to_process, start=1):
-            print(f"\nProcessing cavity row {cavity_index}...")
+            logger.info(f"\nProcessing cavity row {cavity_index}...")
             cavity_number = row.find_element(By.XPATH, "./td[1]").text.strip()
             if not cavity_number:
                 raise RuntimeError(f"Could not read cavity number for row index {cavity_index}")
@@ -185,7 +188,7 @@ def prepare_cavity_tables(driver, pocket_limit=-1):
             residues_text = residues_td.text.strip()
             residues_list = [r.strip() for r in residues_text.split(',') if r.strip()]
 
-            print(f"Surface Area: {surface_area}, Volume: {volume}, #residues: {len(residues_list)}")
+            logger.info(f"Surface Area: {surface_area}, Volume: {volume}, #residues: {len(residues_list)}")
 
             # --- POPULATE VA TABLE ---
             va_table.append([cavity_index, surface_area, volume])
@@ -197,13 +200,13 @@ def prepare_cavity_tables(driver, pocket_limit=-1):
 
             # --- COLLAPSE ROW ---
             driver.execute_script("arguments[0].click();", more_button)
-            print(f"Collapsed details for row {cavity_index}")
+            logger.info(f"Collapsed details for row {cavity_index}")
 
-        print("\nAll cavities processed successfully.")
+        logger.info(f"\nAll cavities processed successfully at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
         return va_table, residues_table
 
     except Exception as e:
-        print(f"An error occurred while preparing cavity tables: {e}")
+        logger.error(f"An error occurred while preparing cavity tables: {e} \n at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
         raise
 
 
@@ -226,10 +229,10 @@ def write_to_csv(va_table, residues_table, pdb_name, output_dir="output"):
         with open(os.path.join(output_path, residues_csv_filename), 'w', newline='', encoding='utf-8') as res_file:
             csv.writer(res_file).writerows(residues_table)
 
-        print(f"CSV files written successfully to {output_path}")
+        logger.info(f"CSV files written successfully to {output_path} at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
     except Exception as e:
-        print(f"An error occurred while writing CSV files: {e}")
+        logger.error(f"An error occurred while writing CSV files: {e} \n at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
         raise
 
 def write_to_xlsx(va_table, residues_table, pdb_name, output_dir="output"):
@@ -305,12 +308,12 @@ def write_to_xlsx(va_table, residues_table, pdb_name, output_dir="output"):
 
         # Save the workbook
         workbook.save(xlsx_path)
-        print(f"Excel file written successfully to {xlsx_path}")
+        logger.info(f"Excel file written successfully to {xlsx_path} \n at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
-    except ImportError:
-        raise ImportError("openpyxl is required for Excel export. Install it with: pip install openpyxl")
+    except ImportError as e:
+        raise ImportError(f"openpyxl is required for Excel export. Install it with: pip install openpyxl: \n {e} \n at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     except Exception as e:
-        print(f"An error occurred while writing the Excel file: {e}")
+        logger.error(f"An error occurred while writing the Excel file: {e} \n at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
         raise
 
 
@@ -355,7 +358,7 @@ def run_cavity_plus(pdb_input: str, config: SectionProxy):
     try:
         # Define the maximum number of upload attempts
         maximal_upload_attempts = 4
-        print("Beginning upload attempts")
+        logger.info(f"Beginning upload attempts at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
         # Open the CavityPlus URL
         driver.get(cavity_plus_url)
@@ -367,15 +370,15 @@ def run_cavity_plus(pdb_input: str, config: SectionProxy):
                 upload_and_submit_pdb(driver, pdb_file_path, pdb_input)
                 break  # Exit the loop if successful
             except CavityPlusUploadException as e:
-                print(
-                    f"CavityPlusUploadException was thrown. Upload was unsuccessful. Attempt {attempt}/{maximal_upload_attempts}")
-                print(f"Error: {e}")
+                logger.error(
+                    f"CavityPlusUploadException was thrown. Upload was unsuccessful. \n Attempt {attempt}/{maximal_upload_attempts} \n at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+                logger.error(f"Error thrown: {e}")
                 # Reload the CavityPlus URL
                 driver.get(cavity_plus_url)
                 driver.execute_script("location.reload(true);")
                 time.sleep(1)
                 if attempt == maximal_upload_attempts:
-                    print(f"Maximal number of upload attempts ({maximal_upload_attempts}) reached. Giving up.")
+                    logger.warning(f"Maximal number of upload attempts ({maximal_upload_attempts}) reached. Giving up.")
                     raise  # Re-raise the exception if all attempts fail
 
 
@@ -384,19 +387,19 @@ def run_cavity_plus(pdb_input: str, config: SectionProxy):
         download_button = WebDriverWait(driver, 300).until(
             EC.element_to_be_clickable(download_button_locator)
         )
-        print("CVPL: Download results button is now visible and clickable")
+        logger.info("CVPL: Download results button is now visible and clickable")
 
         write_cavity_results(driver, pdb_name, output_dir, pocket_limit=pocket_limit)
 
     except Exception as e:
-        print(f"CVPL: An error occurred: {e}")
+        logger.error(f"CVPL: An error occurred: {e} \n at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
     finally:
         # Close the browser
-        print("CAVITYPLUS: finally quitting driver")
+        logger.info(f"CAVITYPLUS: finally quitting driver.")
         driver.quit()
 
-    print("Cavity Plus script completed")
+    logger.info(f"Cavity Plus script completed at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
 if __name__ == '__main__':
     config = load_config()

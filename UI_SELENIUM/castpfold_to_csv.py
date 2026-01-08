@@ -1,10 +1,12 @@
 import configparser
 import csv
+import logging
 import openpyxl
 import os
 
 import time
 from configparser import SectionProxy
+from datetime import datetime
 
 from selenium.webdriver.common.by import By
 from selenium import webdriver
@@ -15,6 +17,8 @@ from selenium.webdriver.support import expected_conditions as EC
 
 from castpfold_request import submit_castpfold_request
 from file_namer import FileNamer, MethodType
+
+logger = logging.getLogger(__name__)
 
 def enter_text_in_input(driver, input_id, text):
     """
@@ -136,7 +140,7 @@ def prepare_atom_info_for_save(driver, pocket_limit):
                         # Add the row to the set as a tuple (to avoid duplicates)
                         unique_atom_rows.add(tuple(atom_row))
 
-                print(f"Atom pagination tab {ia} is displayed")
+                logger.info(f"Atom pagination tab {ia} is displayed")
 
                 if ia < atom_tab_count:
                     next_button = ul_atom_pagination[-1].find_element(By.CSS_SELECTOR, "li.ant-pagination-next a")
@@ -173,7 +177,8 @@ def prepare_atom_info_for_save(driver, pocket_limit):
             time.sleep(0.5)
 
         except Exception as e:
-            print(f"Error processing pocket {i}: {e}")
+
+            logger.info(f"Error processing pocket {i}: {e} at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
             raise
 
     return cav_list_all_atom_rows
@@ -222,7 +227,7 @@ def write_cav_all_atom_rows_to_excel(headers, rows, cav_list_all_atom_rows, outp
     excel_file_path = f"{output_directory}/{pdb_name}/{residues_excel_file_name}.xlsx"
     workbook.save(excel_file_path)
 
-    print(f"All atom info saved to {excel_file_path}")
+    logger.info(f"All atom info saved to {excel_file_path} at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
 def write_pockets_to_csv(headers, rows, output_directory, pdb_name):
     # Create the output directory if it doesn't exist
@@ -237,7 +242,7 @@ def write_pockets_to_csv(headers, rows, output_directory, pdb_name):
         writer.writerow(headers)
         writer.writerows(rows)
 
-    print(f"Data written to {cspf_va_filename}")
+    logger.info(f"Data written to {cspf_va_filename} at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
 
 
@@ -256,7 +261,7 @@ def iterate_pagination(driver, output_directory, pdb_name: str, pocket_limit =1)
     # Get the last tab number from the list
     last_tab = pagination_items[-1]
     tab_count = int(last_tab.text)
-    print(f"Total pagination tabs for all pockets: {tab_count}")
+    logger.info(f"Total pagination tabs for all pockets: {tab_count}")
 
     # In case of pocket limit < 10, only the first page tab should be treated
     max_pagination_item=2
@@ -269,7 +274,7 @@ def iterate_pagination(driver, output_directory, pdb_name: str, pocket_limit =1)
         )
 
         # Print the current tab number
-        print(f"Pagination tab {i} is displayed")
+        logger.info(f"Pagination tab {i} is displayed")
 
         # write_pocket_info_csv(driver, output_directory, pdb_name, pocket_limit)
         # open_atom_info_save_csv(driver, output_directory, pdb_name, pocket_limit)
@@ -299,11 +304,11 @@ def iterate_pagination(driver, output_directory, pdb_name: str, pocket_limit =1)
     first_tab.click()
 
     # Print completion message
-    print(f"All {max_pagination_item-1} tabs displayed since pocket limit is set: {pocket_limit}")
+    logger.info(f"All {max_pagination_item-1} tabs displayed since pocket limit is set: {pocket_limit} at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
 
 def run_castpfold(pdb_file, config: SectionProxy):
-    print("Starting CASTpFold script...")
+    logger.info("Starting CASTpFold script...  at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     # Load config
     # config = load_config()
     chrome_driver_path = config['chrome_driver_path']
@@ -313,13 +318,13 @@ def run_castpfold(pdb_file, config: SectionProxy):
     #config['out_dir']  + '_' + job_number
     pocket_limit = int(config['pocket_limit'])
     # To be requested from the input directory using pdb_name
-    print(f"CASTpFold request for a file: {pdb_file}")
+    logger.info(f"CASTpFold request for a file: {pdb_file}")
     input_dir = config['input_dir']
     if not FileNamer.verify_pdb_exists(input_dir, pdb_file):
         raise Exception(f"File {pdb_file} does not exist in the {input_dir}")
     job_number = submit_castpfold_request(os.path.join(input_dir, pdb_file))
     pdb_name = os.path.splitext(pdb_file)[0]
-    print(f"CASTpFold script initialized from config, pocket_limit: {pocket_limit}")
+    logger.info(f"CASTpFold script initialized from config, pocket_limit: {pocket_limit}")
 
     # Set up Chrome options to automatically download files
     chrome_options = Options()
@@ -339,9 +344,9 @@ def run_castpfold(pdb_file, config: SectionProxy):
 
     try:
         # Open the specified URL
-        print(f"Waiting 20 secs for the job to complete...")
+        logger.info(f"Waiting 20 secs for the job to complete...")
         time.sleep(20)
-        print(f"Loading castpFold page...")
+        logger.info(f"Loading castpFold page... at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
         driver.get(f"{base_url}?{job_number}")
         # Wait until the button is visible and clickable
         download_button = WebDriverWait(driver, 20).until(
@@ -349,17 +354,17 @@ def run_castpfold(pdb_file, config: SectionProxy):
                 (By.XPATH, "//button[contains(@class, 'ant-btn-primary') and .//span[text()='Download CASTpFold Data']]")
             )
         )
-        print(f"Download button appeared with text: {download_button.text}")
+        logger.info(f"Download button appeared with text: {download_button.text}")
         time.sleep(1)
         iterate_pagination(driver, output_directory=output_directory,pdb_name=pdb_name, pocket_limit=pocket_limit)
         time.sleep(1)
     except BaseException as e:
-        print(f"Error while running casfpfold  on {pdb_file}: ", e)
+        logger.error(f"Error while running casfpfold  on {pdb_file} at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}: ", e)
     finally:
-        print("castpfold finally, going to quit driver")
+        logger.info(f"castpfold finally, going to quit driver at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
         driver.quit()
 
-    print("CASTpFold script completed.")
+    logger.info("CASTpFold script completed.")
 
 
 if __name__ == '__main__':

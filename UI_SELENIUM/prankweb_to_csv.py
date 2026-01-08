@@ -5,6 +5,9 @@ import configparser
 from configparser import SectionProxy
 from file_namer import FileNamer, MethodType
 
+from datetime import datetime
+import logging
+
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
@@ -13,11 +16,12 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
 import pandas as pd
-from openpyxl import Workbook
 
 import shutil
 import time
 import zipfile
+
+logger = logging.getLogger(__name__)
 
 def load_config():
     config = configparser.ConfigParser()
@@ -46,11 +50,11 @@ def delete_directory(download_dir):
     try:
         if os.path.exists(download_dir):
             shutil.rmtree(download_dir)
-            print(f"Directory '{download_dir}' and its contents have been deleted.")
+            logger.info(f"Directory '{download_dir}' and its contents have been deleted at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}.")
         else:
-            print(f"Directory '{download_dir}' does not exist. No action taken.")
+            logger.info(f"Directory '{download_dir}' does not exist. No action taken at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     except Exception as e:
-        print(f"Warning: Failed to delete directory '{download_dir}'. Error: {e}")
+        logger.error(f"Warning: Failed to delete directory '{download_dir}'. Error: {e} \n at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
 
 def run_prankweb(pdb_input: str, config: SectionProxy):
@@ -74,12 +78,12 @@ def run_prankweb(pdb_input: str, config: SectionProxy):
     # Create the directory (or clear it if it exists and is not empty)
     if os.path.exists(download_dir):
         if os.listdir(download_dir):  # Check if directory is not empty
-            print(f"Warning: Directory '{download_dir}' exists and is not empty. Clearing it...")
+            logger.info(f"Warning: Directory '{download_dir}' exists and is not empty. Clearing it... at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
             shutil.rmtree(download_dir)  # Delete the directory and all its contents
         else:
-            print(f"Directory '{download_dir}' exists and is empty. Reusing it.")
+            logger.info(f"Directory '{download_dir}' exists and is empty. Reusing it.")
     else:
-        print(f"Directory '{download_dir}' does not exist. Creating it...")
+        logger.info(f"Directory '{download_dir}' does not exist. Creating it... at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
     os.makedirs(download_dir, exist_ok=True)  # Create the directory (if it doesn't exist)
     print(f"Directory '{download_dir}' is ready for downloads.")
@@ -142,17 +146,17 @@ def run_prankweb(pdb_input: str, config: SectionProxy):
         #Waiting download to complete
         time.sleep(5)
 
-        print("Prediction completed. Results should be downloaded automatically.")
+        logger.info(f"Prediction completed. Results should be downloaded automatically at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}.")
 
     except Exception as e:
-        print(f"An error occurred: {e}")
+        logger.info(f"An error occurred: {e} \n at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     finally:
         # Close the browser
-        print("Prank2Web finally, going to quit driver")
+        logger.info("Prank2Web finally, going to quit driver")
         driver.quit()
 
     only_unzip_and_process(pdb_input, config)
-    print("P2Rank script completed")
+    logger.info(f"P2Rank script completed at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}.")
 
 def unpack_zip_in_directory(download_dir):
     """
@@ -166,10 +170,10 @@ def unpack_zip_in_directory(download_dir):
     zip_files = [f for f in os.listdir(download_dir) if f.endswith('.zip')]
 
     if not zip_files:
-        print(f"No .zip files found in '{download_dir}'.")
+        logger.info(f"No .zip files found in '{download_dir}'.")
         return None
     elif len(zip_files) > 1:
-        print(f"Warning: Multiple .zip files found in '{download_dir}'. Using the first one: {zip_files[0]}")
+        logger.info(f"Warning: Multiple .zip files found in '{download_dir}'. Using the first one: {zip_files[0]}")
 
     # Use the first .zip file found
     zip_path = os.path.join(download_dir, zip_files[0])
@@ -177,13 +181,14 @@ def unpack_zip_in_directory(download_dir):
     try:
         with zipfile.ZipFile(zip_path, 'r') as zip_ref:
             zip_ref.extractall(download_dir)
-        print(f"Successfully extracted '{zip_path}' to '{download_dir}'.")
+        logger.info(f"Successfully extracted '{zip_path}' to '{download_dir}' at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}.")
         return download_dir
-    except zipfile.BadZipFile:
-        print(f"Error: '{zip_path}' is not a valid .zip file.")
+    except zipfile.BadZipFile as e:
+        logger.error(f"Error: '{zip_path}' is not a valid .zip file. at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}.")
+        logger.error(e)
         return None
     except Exception as e:
-        print(f"Error extracting '{zip_path}': {e}")
+        logger.error(f"Error extracting '{zip_path}': {e} \n at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}.")
         return None
 
 
@@ -205,10 +210,10 @@ def process_prankweb_output(download_dir, pdb_name, output_dir):
 
     # Check if files exist
     if not os.path.exists(os.path.join(download_dir, predictions_file)):
-        print(f"Error: '{predictions_file}' not found in '{download_dir}'.")
+        logger.error(f"Error: '{predictions_file}' not found in '{download_dir}'.")
         return None, None
     if not os.path.exists(os.path.join(download_dir, residues_file)):
-        print(f"Error: '{residues_file}' not found in '{download_dir}'.")
+        logger.error(f"Error: '{residues_file}' not found in '{download_dir}'.")
         return None, None
 
     # Read structure.pdb_predictions.csv into cav_residues
@@ -221,9 +226,9 @@ def process_prankweb_output(download_dir, pdb_name, output_dir):
                 residue_ids = stripped_row['residue_ids']
                 cav_residues[cavity_number] = residue_ids
             except KeyError:
-                print(f"Warning: Missing 'rank' or 'residue_ids' column in '{predictions_file}'.")
+                logger.error(f"Warning: Missing 'rank' or 'residue_ids' column in '{predictions_file}'.")
             except ValueError:
-                print(f"Warning: 'rank' value '{row['rank']}' is not an integer.")
+                logger.error(f"Warning: 'rank' value '{row['rank']}' is not an integer.")
 
     # Read structure.pdb_residues.csv into res_label_name
     with open(os.path.join(download_dir, residues_file), mode='r') as csvfile:
@@ -235,7 +240,7 @@ def process_prankweb_output(download_dir, pdb_name, output_dir):
                 residue_name = stripped_row['residue_name']
                 res_label_name[residue_label] = residue_name
             except KeyError:
-                print(f"Warning: Missing 'residue_label' or 'residue_name' column in '{residues_file}'.")
+                logger.warning(f"Missing 'residue_label' or 'residue_name' column in '{residues_file}'.")
 
     output_table = prepare_output_table(cav_residues, res_label_name)
 
@@ -298,7 +303,7 @@ def write_csv(output_table, pdb_name, output_dir):
         writer.writeheader()
         writer.writerows(output_table)
 
-    print(f"Output table saved to '{output_path}'.")
+    logger.info(f"Output table saved to '{output_path}' at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
 def write_xlsx(output_table, pdb_name, output_dir):
     """
@@ -330,7 +335,7 @@ def write_xlsx(output_table, pdb_name, output_dir):
         for sheet_name, sheet_df in sheets.items():
             sheet_df.to_excel(writer, sheet_name=sheet_name, index=False)
 
-    print(f"Output table saved to '{output_path}'.")
+    logger.info(f"Output table saved to '{output_path}' at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
 
 if __name__ == '__main__':
