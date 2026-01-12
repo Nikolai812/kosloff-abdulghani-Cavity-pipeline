@@ -1,0 +1,11 @@
+# This file is created for definition of custom choice for cavities
+# According to instructions below the cavity for the construction of the consensus file is shall be chosen
+# Default strategy for cavity choosing is 111L: cspf,cvpl,p2rk,- first cavity, pacupp - the longest
+# You have to write OR_NAME and the 4 numbers of cavities to use. The name of cavity should be not less than 1 and not more than 5
+# The OR_Names from PM_INPUT directory which are not in the list shall be handled by the default strategy (111L)
+# If you want to skip the rest OR_Names that are not in the list, use directive: ' - REST: "0"'
+
+- HsOR343CF_1: "1112"
+#- HsOR161_2: "1121"
+#- mhOR05_AF2_DMorginal: "1111"
+- REST: "0"

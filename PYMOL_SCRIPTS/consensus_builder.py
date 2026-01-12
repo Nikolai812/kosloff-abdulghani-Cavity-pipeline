@@ -9,6 +9,7 @@ import stat
 
 
 from pymol_scripts_exception import PymolScriptsException
+from cavities_usage import CavitiesUsage
 from score_handler import ScoreHandler
 
 
@@ -39,8 +40,9 @@ class ConsensusBuilder:
             # st_file_attributes does not exist on non-Windows
             return False
 
+    from typing import List, Dict
     @classmethod
-    def extract_seq_id_for_proper_cavity(cls, sub_path, strategy: StrategyName) ->dict[str,tuple[int,list[int],list[str]]]:
+    def extract_seq_id_for_proper_cavity(cls, sub_path, strategy: StrategyName, use_cavities_dict: List[Dict[str, str]]=None) ->dict[str,tuple[int,list[int],list[str]]]:
         """
         Searches  for 4 .xlsx files:
         containing 'cspf', 'cvpl', 'p2rk', 'pupp' in filenames AND starting with the subdir name.
@@ -55,7 +57,8 @@ class ConsensusBuilder:
             { 'cspf': [...], 'cvpl': [...], 'p2rk': [...], 'pupp': [...] }
         """
 
-        # Internal method to search for a longest cavity worksheet
+        ######### Internal method to search for a longest cavity worksheet #####################
+        ########################################################################################
         def get_longest_cavity_sheet(xls_file: ExcelFile)->tuple[str, int, int] | tuple[None, None, int]:
             max_rows = -1
             selected_sheet = None
@@ -73,7 +76,11 @@ class ConsensusBuilder:
 
             return selected_sheet, selected_cavity_number, max_rows
 
-        #Internal method to select cavity by number
+        ######### END OF: Internal method to search for a longest cavity worksheet #####################
+        ################################################################################################
+
+        ##################### Internal method to select cavity by number ###############################
+        ################################################################################################
         def get_cavity_sheet(cavity_number: int)-> str | None:
             if cavity_number > 5 or  cavity_number < 1:
                 return None
@@ -81,9 +88,73 @@ class ConsensusBuilder:
             selected_cavity_number = cavity_number
             return selected_sheet
 
+        ##################### END OF Internal method to select cavity by number ########################
+        ################################################################################################
+
+        ################### INTERNAL METHOD  select_cavity_sheet_by_strategy##########
+        ##############################################################################
+        def select_cavity_sheet_by_strategy(strategy: StrategyName, xls: ExcelFile , key: str, required_keys: list[str])->tuple[str,int] | tuple[None, None]:
+            """
+            Selects the cavity sheet based on the strategy and key.
+
+            Args:
+                strategy (StrategyName): The strategy to use for selecting the cavity sheet.
+                xls: The Excel file object or data structure.
+                key: The key to check for special handling.
+                required_keys (list): List of required keys for special handling.
+
+            Returns:
+                tuple: (selected_sheet, selected_cavity_number)
+            """
+            selected_sheet = None
+            selected_cavity_number = 1
+
+            # Depending on the strategy, the best cavities are chosen
+            if strategy == StrategyName.FIRST:
+                # First cavity for all
+                selected_sheet = get_cavity_sheet(1)
+                selected_cavity_number = 1
+
+            elif strategy == StrategyName.LONGEST:
+                # Longest strategy for all
+                selected_sheet, selected_cavity_number, _ = get_longest_cavity_sheet(xls)
+
+            # DEFAULT strategy: longest for pupp, first for all other
+            elif key == required_keys[3]:
+                selected_sheet, selected_cavity_number, _ = get_longest_cavity_sheet(xls)
+            else:
+                selected_sheet = get_cavity_sheet(1)
+                selected_cavity_number = 1
+
+            return selected_sheet, selected_cavity_number
+
+        ##############################################################################
+        ################### END OF: INTERNAL METHOD  select_cavity_sheet_by_strategy##
+        ##############################################################################
 
 
+        # Getting or_name from the full path:
         sub = os.path.basename(os.path.normpath(sub_path))
+        # Cavity mask should be defined for a sub, if use_cavities_dictionary is not None, strategy is to be used as a default mask
+        mask_to_apply: str | None = None
+        # If use_cavities_dictionary is defined, the corresponding cavities should be applied for any strategy
+
+        if use_cavities_dict:
+            # 1. First - need to check whether the sub_path is present explicitely. If yes
+            mask_to_apply = CavitiesUsage.get_value_for_key(yaml_dict=use_cavities_dict, target_key=sub)
+            # 2. If not present, apply the rest mask in case if it is not "O"
+            if None == mask_to_apply and not ConsensusBuilder.has_rest_zero(use_cavities_dict):
+                mask_to_apply = CavitiesUsage.get_value_for_key(yaml_dict=use_cavities_dict, target_key="REST")
+                pass
+
+
+            if None == mask_to_apply:
+                logger.info (f"or_name {sub} has no explicit mask, default strategy will be applied")
+            else:
+                logger.info(f"for or_name {sub} using mask_to_apply {mask_to_apply}")
+
+
+
         required_keys = ["cspf", "cvpl", "p2rk", "pupp"]
         results = {k: (-1,[]) for k in required_keys}
         files_found = {k: '' for k in required_keys}
@@ -102,13 +173,15 @@ class ConsensusBuilder:
 
             # match keys
             lower = fname.lower()
+            found = False
             for key in required_keys:
                 if key in lower:
                     files_found[key] = fpath
-                else:
-                    #print(f"{key} file for ORname {fname} is missing, consensus cannot be built ")
-                    logger.warning(f"{key} file for ORname {fname} is missing, consensus cannot be built ")
+                    found = True
+                    break
 
+            if not found and not "consensus" in lower:
+                logger.warning(f"file {fname} does not match any prediction key: {key}, and even is not consensus file, looks like something wrong in {sub_path}")
 
         # process each of the 4 files
         for key, fpath in files_found.items():
@@ -118,42 +191,55 @@ class ConsensusBuilder:
             xls = pd.ExcelFile(fpath)
             selected_sheet = None
             selected_cavity_number = None
-            max_rows = -1
+            # max_rows = -1
 
             # Depending on the strategy, the best cavities are chosen
-            if strategy == StrategyName.FIRST:
-                # First cavity for all
-                selected_sheet = get_cavity_sheet(1)
-                selected_cavity_number =1
-
-            elif strategy == StrategyName.LONGEST:
-                # Longest strategy for all
-                selected_sheet, selected_cavity_number, max_rows = get_longest_cavity_sheet(xls)
-
-            # DEFAULT startegy: longest for pupp, first for all other
-            elif key == required_keys[3]:
-                selected_sheet, selected_cavity_number, max_rows = get_longest_cavity_sheet(xls)
+            if None == mask_to_apply:
+                selected_sheet, selected_cavity_number = select_cavity_sheet_by_strategy(strategy, xls, key,
+                                                                                                 required_keys)
             else:
-                selected_sheet = get_cavity_sheet(1)
-                selected_cavity_number = 1
+                zero_based_index = required_keys.index(key)  # getting 0 in case of "cspf", 1- "cvpl", etc
+                selected_cavity_number_str = mask_to_apply[zero_based_index]
+                selected_cavity_number= int (selected_cavity_number_str)
+                selected_sheet = get_cavity_sheet(selected_cavity_number)
+                logger.info(f"For OR_name {sub} choosing cavity {selected_cavity_number}  for key '{key}', cavity mask '{mask_to_apply}'")
 
-            if selected_sheet is None:
-                logger.warning(f"No Cavity sheets found in {fpath}")
-                continue
+
+            # if strategy == StrategyName.FIRST:
+            #     # First cavity for all
+            #     selected_sheet = get_cavity_sheet(1)
+            #     selected_cavity_number =1
+            #
+            # elif strategy == StrategyName.LONGEST:
+            #     # Longest strategy for all
+            #     selected_sheet, selected_cavity_number, max_rows = get_longest_cavity_sheet(xls)
+            #
+            # # DEFAULT startegy: longest for pupp, first for all other
+            # elif key == required_keys[3]:
+            #     selected_sheet, selected_cavity_number, max_rows = get_longest_cavity_sheet(xls)
+            # else:
+            #     selected_sheet = get_cavity_sheet(1)
+            #     selected_cavity_number = 1
+            #
+            # if selected_sheet is None:
+            #     logger.warning(f"No Cavity sheets found in {fpath}")
+            #     continue
 
             if selected_sheet != "Cavity 1":
                 logger.warning(f": {fpath} used '{selected_sheet}' instead of 'Cavity 1'")
 
-            # extract 3rd column ('Seq ID')
+
             df = xls.parse(selected_sheet)
 
-            if df.shape[1] < 3:
+            # extract 3rd column ('Seq ID') and 4th ('AA')
+            if df.shape[1] < 4:
                 logger.warning(f"Warning: File {fpath}, sheet {selected_sheet} has fewer than 3 columns")
                 continue
 
             seq_ids = df.iloc[:, 2].dropna().tolist()
             aa_names = df.iloc[:, 3].dropna().tolist()
             results[key] = (selected_cavity_number, seq_ids, aa_names)
+
 
         return results
 
@@ -227,7 +313,7 @@ class ConsensusBuilder:
         logger.info(f"Consensus file saved: {out_path} at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
     @classmethod
-    def process_multi_or_folder(cls, sel_output_dir, pm_input_dir, best_cavity_strategy)->None:
+    def process_multi_or_folder(cls, sel_output_dir, pm_input_dir, best_cavity_strategy, use_cavities_dict=None)->None:
         """
         Scans 1st-level subdirectories of the Selenium Output: sel_output_dir (except containing 'temp' and 'OLD'), extracts best cavities ids,
         Then constructs a consensus file according to the chosen strategy and writes it to pm_input_dir.
@@ -241,14 +327,36 @@ class ConsensusBuilder:
         # Creating an empty dictionary for each OR (.pdb file) to keep residue scores
         pdb_aa_scores: dict[str, list[tuple[str, int, float]]] = {}
 
+        # Before iterate
+        subdir_names_to_iterate = []
+        if use_cavities_dict is not None:
+            # 1. Verify that for all keys from yaml (except "REST") correspond to existing OR_subfolders. Otherwise -exception
+            pm_input_subdirs = os.listdir(pm_input_dir)
+            non_rest_yaml_keys = [key for item in use_cavities_dict for key in item.keys() if key != "REST"] #[item.keys()[0] for item in yaml_dict]
+            missing_keys = [key for key in non_rest_yaml_keys if key not in pm_input_subdirs]
+            if missing_keys:
+                raise ValueError(f"The following yaml keys : {missing_keys} do not correspond to any {pm_input_dir} subdirectory {pm_input_subdirs}")
+
+
+            # 2. Verify whether -REST: "0" is present. If yes,  all non_key directories should be skipped (continue)
+            if CavitiesUsage.has_rest_zero(use_cavities_dict):
+                subdir_names_to_iterate = non_rest_yaml_keys
+                logger.info(f"Rest '0' found, the following subdirs are to be processed : {subdir_names_to_iterate}")
+            # 3. Run over all subdirs. If subdir key is present - apply cavity mask, else is REST is present - apply rest mask, else- apply default strategy
+            else:
+                subdir_names_to_iterate = os.listdir(pm_input_dir)
+                logger.info(f"All subdirs from {pm_input_dir} are to be processed : {subdir_names_to_iterate}")
+
+
         # iterate over first-level subdirectories
-        for sub in os.listdir(sel_output_dir):
-            sub_path = os.path.join(sel_output_dir, sub)
-            if not os.path.isdir(sub_path):
-                continue
-            # skipping prankweb_temp and OLD_DATA folders
-            if  'temp' in sub or 'OLD' in sub:
-                continue
+        for sub in subdir_names_to_iterate:
+
+            # sub_path = os.path.join(sel_output_dir, sub)
+            # if not os.path.isdir(sub_path):
+            #     continue
+            # # skipping prankweb_temp and OLD_DATA folders
+            # if  'temp' in sub or 'OLD' in sub:
+            #     continue
 
             sub_path = Path(pm_input_dir) / sub
             if not sub_path.is_dir():
@@ -273,7 +381,7 @@ class ConsensusBuilder:
 
 
             ScoreHandler.collect_subdir_plddt(sub, pm_input_dir, pdb_aa_scores)
-            best_cavity_ids = ConsensusBuilder.extract_seq_id_for_proper_cavity(sub_path, strategy)
+            best_cavity_ids = ConsensusBuilder.extract_seq_id_for_proper_cavity(sub_path, strategy, use_cavities_dict)
             ConsensusBuilder.write_consensus_file(sub, best_cavity_ids, pdb_aa_scores, pm_input_dir)
             print("")
 

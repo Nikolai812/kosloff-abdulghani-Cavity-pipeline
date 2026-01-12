@@ -39,7 +39,8 @@ Write-Output "Defined pymol preparations input dir $pm_input"
 if (Test-Path $pm_input) {
     # Check if the directory is not empty
     if ((Get-ChildItem -Path $pm_input -Recurse -Force).Count -gt 0) {
-        Write-Warning "Directory '$pm_input' exists and is not empty. Clearing all files..."
+        # Different approach than in prepare_consensus_and_pymol.ps1:
+        Write-Warning "Directory '$pm_input' exists and is not empty. Main pipeline:  clearing all files from '$pm_input'"
         # Delete all files in the directory
         Get-ChildItem -Path $pm_input -Recurse -Force | Remove-Item -Force -Recurse
     } else {

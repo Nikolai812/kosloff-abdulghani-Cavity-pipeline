@@ -6,6 +6,8 @@ import pandas as pd
 import stat
 import shutil
 
+from cavities_usage import CavitiesUsage
+
 logger = logging.getLogger(__name__)
 
 def read_config():
@@ -151,7 +153,7 @@ def generate_multi_cav_pml(all_files_data, pdb_dir, output_dir):
         logger.info(f"  PyMol session file: {pse_path}")
 
 
-def prepare_for_pymol(input_directory, output_directory, copy_input=False):
+def prepare_for_pymol(input_directory, output_directory, use_cavities_dict, copy_input=False):
     """
     Prepares PyMOL scripts for all 1st-level subdirectories in input_directory.
     Verifies .pdb and .xlsx files, creates output subdirectories, and generates PyMOL scripts.
@@ -164,8 +166,21 @@ def prepare_for_pymol(input_directory, output_directory, copy_input=False):
     # Ensure output directory exists
     os.makedirs(output_directory, exist_ok=True)
 
+    subdir_names_to_iterate = []
+    if use_cavities_dict is not None:
+
+        # Verify whether -REST: "0" is present. If yes,  all non_key directories should be skipped (continue)
+        if CavitiesUsage.has_rest_zero(use_cavities_dict):
+            non_rest_yaml_keys = [key for item in use_cavities_dict for key in item.keys() if key != "REST"]
+            subdir_names_to_iterate = non_rest_yaml_keys
+            logger.info(f"prepare_for_pymol: REST: '0' found, the following subdirs are to be used for pymol scripts renewing: {subdir_names_to_iterate}")
+        else:
+            subdir_names_to_iterate = os.listdir(input_directory)
+            logger.info(
+                f"prepare_for_pymol: All subdirs from {input_directory} are to be used for pymol scripts renewing: {subdir_names_to_iterate}")
+
     # Iterate over 1st-level subdirectories in input_directory
-    for subdir_name in os.listdir(input_directory):
+    for subdir_name in subdir_names_to_iterate:
         subdir_path = os.path.join(input_directory, subdir_name)
 
         # Skip if not a directory

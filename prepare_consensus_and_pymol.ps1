@@ -29,9 +29,7 @@ Write-Host "  $pm_input"
 if (Test-Path $pm_input) {
     # Check if the directory is not empty
     if ((Get-ChildItem -Path $pm_input -Recurse -Force).Count -gt 0) {
-        Write-Warning "Directory '$pm_input' exists and is not empty. Clearing all files..."
-        # Delete all files in the directory
-        Get-ChildItem -Path $pm_input -Recurse -Force | Remove-Item -Force -Recurse
+        Write-Warning "Directory '$pm_input' exists and is not empty. Keep everything, non deletion. !!! Different approach than in main pipeline"
     } else {
         Write-Host "Directory '$pm_input' exists and is empty. No action taken."
     }
@@ -58,7 +56,7 @@ Get-ChildItem -Path $predictions_input -Filter "*.pdb" -File | ForEach-Object {
 
 #defining the 4 predictions output directory and
 
-Write-Output "Copying 4 predictions output to pymol input dir"
+Write-Output "Copied 4 predictions output to pymol input dir"
 
 
 # Write-Output "Starting consensus building and pymol scripts preparation"
