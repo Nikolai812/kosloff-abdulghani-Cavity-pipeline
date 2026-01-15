@@ -58,10 +58,16 @@ def main():
         ConsensusBuilder.process_multi_or_folder(selenium_output_dir, pm_input_dir, best_cavity_strategy, use_cavities_dict)
         logger.info(f"Successfully processed {pm_input_dir},  at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
+        # 2. Preparing coloring scripts for PyMol
+        logger.info(f"Starting task: PyMol script preparation for {pm_input_dir}.")
+        # looks to be called for all, even is REST: 0
+        prepare_for_pymol(pm_input_dir, pm_output_dir, use_cavities_dict, copy_input=True)
+        logger.info(
+            f"Completed task:  PyMol script preparation to {pm_output_dir}, exiting at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+
     except ValueError as e:
         logging.error(f"Exception type: {type(e)}")  # Debugging line
         logging.error(f"Value Error processing {pm_input_dir},: {e} at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-        logging.error(f"Probable reason from .yaml: {use_cavities_dict}")
     except PymolScriptsException as e:
         logging.error(f"Exception type: {type(e)}")  # Debugging line
         logging.error(f"Error processing {pm_input_dir}: {e} at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
@@ -70,13 +76,7 @@ def main():
         logging.critical(f"Unexpected error when processing {pm_input_dir}: {e} at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
         traceback.print_exc()  # Print the full traceback
 
-    # 2. Preparing coloring scripts for PyMol
 
-    logger.info(f"Starting task: PyMol script preparation for {pm_input_dir}.")
-    # looks to be called for all, even is REST: 0
-    prepare_for_pymol(pm_input_dir, pm_output_dir, use_cavities_dict, copy_input=True)
-    logger.info(
-        f"Completed task:  PyMol script preparation to {pm_output_dir}, exiting at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
 if __name__ == "__main__":
     main()

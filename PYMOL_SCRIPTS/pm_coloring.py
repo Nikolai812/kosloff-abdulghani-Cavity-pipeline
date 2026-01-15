@@ -150,7 +150,6 @@ def generate_multi_cav_pml(all_files_data, pdb_dir, output_dir):
             # f.write("quit\n")
 
         logger.info(f"  Generated script {pml_path}")
-        logger.info(f"  PyMol session file: {pse_path}")
 
 
 def prepare_for_pymol(input_directory, output_directory, use_cavities_dict, copy_input=False):
@@ -192,7 +191,7 @@ def prepare_for_pymol(input_directory, output_directory, use_cavities_dict, copy
         # Step 1: Verify .pdb file
         pdb_files = [f for f in os.listdir(subdir_path) if f.endswith('.pdb')]
         if len(pdb_files) != 1:
-            logger.info(f"  Warning: Expected 1 .pdb file in {subdir_name}, found {len(pdb_files)}")
+            logger.warning(f"  Warning: Not found .pdb file in {subdir_name}, (found {len(pdb_files)} .pdbs), skipping PyMOL scripts for {subdir_name}")
             continue
 
         pdb_file = pdb_files[0]
@@ -229,7 +228,7 @@ def prepare_for_pymol(input_directory, output_directory, use_cavities_dict, copy
         # Step 3: Create output subdirectory
         output_subdir = os.path.join(output_directory, subdir_name)
         if os.path.exists(output_subdir):
-            print(f"  Warning: Output directory '{output_subdir}' already exists, deleting it")
+            logger.warning(f"!!!!!!!!!!!!  Warning: Output directory '{output_subdir}' already exists, deleting it   !!!!!!!!!!!")
             shutil.rmtree(output_subdir)  # Delete existing subdirectory
         os.makedirs(output_subdir)
 

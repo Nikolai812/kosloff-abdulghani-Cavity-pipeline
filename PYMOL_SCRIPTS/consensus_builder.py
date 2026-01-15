@@ -204,30 +204,8 @@ class ConsensusBuilder:
                 selected_sheet = get_cavity_sheet(selected_cavity_number)
                 logger.info(f"For OR_name {sub} choosing cavity {selected_cavity_number}  for key '{key}', cavity mask '{mask_to_apply}'")
 
-
-            # if strategy == StrategyName.FIRST:
-            #     # First cavity for all
-            #     selected_sheet = get_cavity_sheet(1)
-            #     selected_cavity_number =1
-            #
-            # elif strategy == StrategyName.LONGEST:
-            #     # Longest strategy for all
-            #     selected_sheet, selected_cavity_number, max_rows = get_longest_cavity_sheet(xls)
-            #
-            # # DEFAULT startegy: longest for pupp, first for all other
-            # elif key == required_keys[3]:
-            #     selected_sheet, selected_cavity_number, max_rows = get_longest_cavity_sheet(xls)
-            # else:
-            #     selected_sheet = get_cavity_sheet(1)
-            #     selected_cavity_number = 1
-            #
-            # if selected_sheet is None:
-            #     logger.warning(f"No Cavity sheets found in {fpath}")
-            #     continue
-
             if selected_sheet != "Cavity 1":
                 logger.warning(f": {fpath} used '{selected_sheet}' instead of 'Cavity 1'")
-
 
             df = xls.parse(selected_sheet)
 
@@ -370,12 +348,14 @@ class ConsensusBuilder:
 
             if not (len(pdb_files) == 1):
                 logger.warning(f"Expected exactly one .pdb file in {sub_path}, "
-                                            f"found {len(pdb_files)}, skipping the {sub_path.name}")
+                                            f"found {len(pdb_files)}, skipping the {sub_path.name}, \n"
+                                                 f"please, find {expected_pdb} and put it manually to {sub_path.name} and rerun the script")
                 continue
 
-            if not (pdb_files[0] == expected_pdb):
+            elif not (pdb_files[0] == expected_pdb):
                 logger.warning(f"Expected PDB file named {expected_pdb.name}, "
-                                            f"found {pdb_files[0].name}"
+                                            f"found {pdb_files[0].name}",
+                                            f"please, find {expected_pdb} and put it manually to {sub_path.name} and rerun the script"
                                             )
                 continue
 

@@ -130,5 +130,5 @@ if __name__ == '__main__':
     # Call the main function with the parsed argument
     main(args.rerun_prediction)
 
-    print(f"End of main.py script... at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    logger.info(f"End of main.py script... at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
