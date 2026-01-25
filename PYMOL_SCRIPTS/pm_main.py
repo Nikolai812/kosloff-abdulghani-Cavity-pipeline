@@ -44,6 +44,11 @@ def main():
     best_cavity_strategy=config['best_cavity_strategy']
     use_cavities_file=config['use_cavities']
 
+    # PLACEHOLDER to handle input (select input files from PYMOL_SCRIPTS/PM_INPUT)
+    #
+    ### file_selected = input("Please enter a filename: ")
+    ### print(f"You entered: {file_selected}")
+    #### raise ValueError("Just checking input")
 
     try:
         # 1. Creating consensus file (in a pm_input dir for further script creation)
