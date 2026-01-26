@@ -1,11 +1,36 @@
 import configparser
+import logging
 import os
 from UI_SELENIUM.file_namer import MethodType
 
 import shutil
-import warnings
 
 
+# Set a logger for this very script
+logger = logging.getLogger(__name__)
+
+# Color formatting class for console output
+class ColorFormatter(logging.Formatter):
+    COLORS = {
+        logging.DEBUG: "\033[37m",     # Gray
+        logging.INFO: "\033[0m",       # Default
+        logging.WARNING: "\033[33m",   # Yellow
+        logging.ERROR: "\033[31m",     # Red
+        logging.CRITICAL: "\033[41m",  # Red background
+    }
+
+    RESET = "\033[0m"
+
+    def format(self, record):
+        color = self.COLORS.get(record.levelno, self.RESET)
+
+        if record.levelno >= logging.WARNING:
+            msg = f"{record.levelname}: {record.getMessage()}"
+        else:
+            msg = record.getMessage()
+
+        return f"{color}{msg}{self.RESET}"
+# End of ColorFormatter class
 
 def verify_and_copy(
     selenium_input_dir: str,
@@ -58,7 +83,7 @@ def verify_and_copy(
             )
 
             if not found:
-                warnings.warn(
+                logger.warning(
                     f"Missing XLSX file for OR_NAME='{or_name}', "
                     f"MethodType='{method.name}',"
                     f"!!!!!!!! CONSENSUS file cannot be built for {or_name}!!!!"
@@ -72,7 +97,7 @@ def verify_and_copy(
         dst_dir = os.path.join(pymol_input_dir, or_name)
 
         if os.path.exists(dst_dir):
-            warnings.warn(
+            logger.info(
                 f"+++++ Directory already exists and will be overwritten: {dst_dir}"
             )
             shutil.rmtree(dst_dir)
@@ -92,9 +117,8 @@ def verify_and_copy(
         )
 
         if pdb_found is None:
-            warnings.warn(
-                f"!!!!!! Missing PDB file for OR_NAME='{or_name}', PYMOL script won't work for it"
-            )
+            logger.warning(
+                f"!!!!!!! Missing PDB file for OR_NAME='{or_name}', PYMOL script won't work for it")
             continue
 
         shutil.copy2(
@@ -104,8 +128,26 @@ def verify_and_copy(
 
 
 def main() -> None:
-    script_dir = os.path.dirname(os.path.abspath(__file__))  # folder where main.py is
 
+    # Setting logger and color logging fot console
+    handler = logging.StreamHandler()
+    handler.setFormatter(ColorFormatter())
+
+    file_handler = logging.FileHandler("log_data_to_pm.log")
+    file_handler.setFormatter(
+        logging.Formatter("%(asctime)s %(levelname)s: %(message)s")
+    )
+
+    logging.basicConfig(
+        level=logging.INFO,
+        handlers=[
+             handler, file_handler
+        ]
+    )
+    # end of logger settings
+
+    script_dir = os.path.dirname(os.path.abspath(__file__))  # folder of this very script
+    logger.info(f"\n!!!!!! Script Data_to_PM_INPUT running at directory: {script_dir} !!!! ")
     selenium_config = configparser.ConfigParser()
     selenium_config_path = os.path.join(script_dir, "UI_SELENIUM/config.ini")
     selenium_config.read(selenium_config_path, encoding="utf-8")
@@ -118,10 +160,14 @@ def main() -> None:
     selenium_output_dir = os.path.join(script_dir, "UI_SELENIUM",selenium_config['DEFAULT']['output_dir'])
     pymol_input_dir = os.path.join(script_dir, "PYMOL_SCRIPTS", pymoll_config['visualization']['pm_input_dir'])
 
+    logger.info("\n\n===============================================================================================")
+    logger.info(f"Starting verification and copying: \n {selenium_input_dir}, {selenium_output_dir} -> {pymol_input_dir} completed")
+    logger.info("===============================================================================================\n\n")
+
     verify_and_copy(selenium_input_dir, selenium_output_dir, pymol_input_dir)
-    i =1
-
-
+    logger.info("===============================================================================================")
+    logger.info(f"Verify and copy from {selenium_input_dir}, {selenium_output_dir} -> {pymol_input_dir} completed")
+    logger.info("===============================================================================================")
 
 
 if __name__ == '__main__':
