@@ -8,31 +8,35 @@ from castpfold_to_csv import run_castpfold
 from cavity_plus_to_csv import run_cavity_plus
 from prankweb_to_csv import run_prankweb
 from pupp_out_to_csv import  process_pupp_out_directory
-
+from utils import load_config
 import os
 
 # Set a specific logger for the project
 logger = logging.getLogger(__name__)
 
+# Color formatting class for console output
+class ColorFormatter(logging.Formatter):
+    COLORS = {
+        logging.DEBUG: "\033[37m",     # Gray
+        logging.INFO: "\033[0m",       # Default
+        logging.WARNING: "\033[33m",   # Yellow
+        logging.ERROR: "\033[31m",     # Red
+        logging.CRITICAL: "\033[41m",  # Red background
+    }
 
-def load_config():
-    config = configparser.ConfigParser()
-    script_dir = os.path.dirname(os.path.abspath(__file__))  # folder where main.py is
-    config_path = os.path.join(script_dir, "config.ini")
-    config.read(config_path, encoding="utf-8")
+    RESET = "\033[0m"
 
-    # Updating all relative paths from config to get the absolute values starting from the location of tha main.py file
-    config['DEFAULT']['script_dir'] = script_dir
-    config['DEFAULT']['input_dir'] = os.path.join(script_dir, config['DEFAULT']['input_dir'])
-    config['DEFAULT']['output_dir'] = os.path.join(script_dir, config['DEFAULT']['output_dir'])
-    config['DEFAULT']['pacupp_python_feedup'] = os.path.join(script_dir, config['DEFAULT']['pacupp_python_feedup'])
-    config['DEFAULT']['prankweb_temp'] = os.path.join(script_dir, config['DEFAULT']['prankweb_temp'])
-    # End of relative path update
+    def format(self, record):
+        color = self.COLORS.get(record.levelno, self.RESET)
 
-    logging.info(f"Configuration loaded from {config_path}, sections: {config.sections()} defaults: {config.defaults()}")
-    version=config['DEFAULT']['version']
-    logging.info(f"########## CAVITY PIPELINE VERSION: {version}")
-    return config['DEFAULT']
+        if record.levelno >= logging.WARNING:
+            msg = f"{record.levelname}: {record.getMessage()}"
+        else:
+            msg = record.getMessage()
+
+        return f"{color}{msg}{self.RESET}"
+# End of ColorFormatter class
+
 
 
 def get_pdb_files(input_directory: str) -> list[str]:
@@ -79,14 +83,23 @@ def run_4_predictions(pdb_files: list[str], config: SectionProxy) -> None:
     pass
 
 def main(rerun_prediction: str = None) -> None:
+    # Setting logger and color logging fot console
+    handler = logging.StreamHandler()
+    handler.setFormatter(ColorFormatter())
+
+    file_handler = logging.FileHandler("log_data_to_pm.log")
+    file_handler.setFormatter(
+        logging.Formatter("%(asctime)s %(levelname)s: %(message)s")
+    )
+
     logging.basicConfig(
         level=logging.INFO,
-        format='%(levelname)s: %(message)s',
         handlers=[
-            logging.StreamHandler(),  # Log to console
-            logging.FileHandler('ui_selenium.log')  # Uncomment to log to a file
+            handler, file_handler
         ]
     )
+    # end of logger settings
+
 
     logger.info(f"Starting main.py script... at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     config = load_config()

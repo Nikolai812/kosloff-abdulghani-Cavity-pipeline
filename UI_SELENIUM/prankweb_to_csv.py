@@ -1,16 +1,10 @@
 import os
 import csv
 
-import configparser
 from configparser import SectionProxy
-from file_namer import FileNamer, MethodType
-
 from datetime import datetime
 import logging
 
-from selenium import webdriver
-from selenium.webdriver.chrome.service import Service
-from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
@@ -21,12 +15,12 @@ import shutil
 import time
 import zipfile
 
-logger = logging.getLogger(__name__)
+from chrome_driver_factory import create_chrome_driver
+from file_namer import FileNamer, MethodType
+from utils import str_to_bool, load_config
 
-def load_config():
-    config = configparser.ConfigParser()
-    config.read('config.ini')
-    return config['DEFAULT']
+
+logger = logging.getLogger(__name__)
 
 def only_unzip_and_process(pdb_input: str, config: SectionProxy):
     output_dir = config['output_dir']
@@ -65,16 +59,14 @@ def run_prankweb(pdb_input: str, config: SectionProxy):
     output_dir = config['output_dir']
     prankweb_temp = config['prankweb_temp']
     pocket_limit = int(config['pocket_limit'])
+    headless = config['chrome_headless_mode']
     pdb_name = os.path.splitext(pdb_input)[0]
 
     # Construct the full path to the PDB file
     pdb_file_path = os.path.abspath(os.path.join(input_dir, pdb_input))
-
-    # Set up Chrome options to automatically download files
-    chrome_options = Options()
     script_dir = os.path.dirname(os.path.abspath(__file__))
-
     download_dir = os.path.join(script_dir, output_dir, prankweb_temp, pdb_name)
+
     # Create the directory (or clear it if it exists and is not empty)
     if os.path.exists(download_dir):
         if os.listdir(download_dir):  # Check if directory is not empty
@@ -88,17 +80,8 @@ def run_prankweb(pdb_input: str, config: SectionProxy):
     os.makedirs(download_dir, exist_ok=True)  # Create the directory (if it doesn't exist)
     print(f"Directory '{download_dir}' is ready for downloads.")
 
-    prefs = {
-        "download.default_directory": download_dir,
-        "download.prompt_for_download": False,
-        "download.directory_upgrade": True,
-        "safebrowsing.enabled": False
-    }
-    chrome_options.add_experimental_option("prefs", prefs)
-
-    # Set up the WebDriver with the specified path
-    service = Service(chrome_driver_path)
-    driver = webdriver.Chrome(service=service, options=chrome_options)
+    use_headless_mode = str_to_bool(headless)
+    driver = create_chrome_driver(chrome_driver_path, download_dir, use_headless_mode)
 
     try:
         # Open the Prankweb URL
@@ -150,6 +133,9 @@ def run_prankweb(pdb_input: str, config: SectionProxy):
 
     except Exception as e:
         logger.info(f"An error occurred: {e} \n at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        timestamp = time.strftime("%Y%m%d_%H%M%S")
+        screenshot_path = f"err_p2rk_{timestamp}.png"
+        driver.save_screenshot(screenshot_path)
     finally:
         # Close the browser
         logger.info("Prank2Web finally, going to quit driver")

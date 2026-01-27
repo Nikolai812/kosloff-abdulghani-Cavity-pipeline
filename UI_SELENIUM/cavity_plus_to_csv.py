@@ -1,32 +1,26 @@
 import csv
 import os
-import configparser
+
 from configparser import SectionProxy
 
 from datetime import datetime
 import logging
 
-from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait, Select
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.chrome.service import Service
-from selenium.webdriver.chrome.options import Options
+
 import time
 
+from chrome_driver_factory import create_chrome_driver
 from file_namer import FileNamer, MethodType
+from utils import load_config, str_to_bool
 
 logger = logging.getLogger(__name__)
 
 class CavityPlusUploadException(Exception):
     """Custom exception for CavityPlus upload failures."""
     pass
-
-
-def load_config():
-    config = configparser.ConfigParser()
-    config.read('config.ini')
-    return config['DEFAULT']
 
 
 def upload_and_submit_pdb(driver, pdb_file_path, pdb_input):
@@ -317,7 +311,6 @@ def write_to_xlsx(va_table, residues_table, pdb_name, output_dir="output"):
         raise
 
 
-
 def write_cavity_results(driver, pdb_name, output_dir="output", pocket_limit=-1):
     """Refactored method to prepare tables and write to CSV."""
     va_table, residues_table = prepare_cavity_tables(driver, pocket_limit)
@@ -333,27 +326,17 @@ def run_cavity_plus(pdb_input: str, config: SectionProxy):
     input_dir = config['input_dir']
     output_dir = config['output_dir']
     pocket_limit = int(config['pocket_limit'])
+    headless = config['chrome_headless_mode']
     pdb_name=os.path.splitext(pdb_input)[0]
     print(f"Running Cavity plus processing to {pdb_input}")
 
     # Construct the full path to the PDB file
     pdb_file_path = os.path.abspath(os.path.join(input_dir, pdb_input))
-
-    # Set up Chrome options to automatically download files
-    chrome_options = Options()
     script_dir = os.path.dirname(os.path.abspath(__file__))
     download_dir = os.path.join(script_dir, "output")
-    prefs = {
-        "download.default_directory": download_dir,
-        "download.prompt_for_download": False,
-        "download.directory_upgrade": True,
-        "safebrowsing.enabled": False
-    }
-    chrome_options.add_experimental_option("prefs", prefs)
 
-    # Set up the WebDriver with the specified path
-    service = Service(chrome_driver_path)
-    driver = webdriver.Chrome(service=service, options=chrome_options)
+    use_headless_mode = str_to_bool(headless)
+    driver = create_chrome_driver(chrome_driver_path, download_dir, use_headless_mode)
 
     try:
         # Define the maximum number of upload attempts
@@ -393,6 +376,9 @@ def run_cavity_plus(pdb_input: str, config: SectionProxy):
 
     except Exception as e:
         logger.error(f"CVPL: An error occurred: {e} \n at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        timestamp = time.strftime("%Y%m%d_%H%M%S")
+        screenshot_path = f"err_cvpl_{timestamp}.png"
+        driver.save_screenshot(screenshot_path)
 
     finally:
         # Close the browser

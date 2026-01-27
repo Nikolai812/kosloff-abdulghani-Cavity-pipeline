@@ -9,14 +9,13 @@ from configparser import SectionProxy
 from datetime import datetime
 
 from selenium.webdriver.common.by import By
-from selenium import webdriver
-from selenium.webdriver.chrome.service import Service
-from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
 from castpfold_request import submit_castpfold_request
+from chrome_driver_factory import create_chrome_driver
 from file_namer import FileNamer, MethodType
+from utils import str_to_bool
 
 logger = logging.getLogger(__name__)
 
@@ -245,9 +244,6 @@ def write_pockets_to_csv(headers, rows, output_directory, pdb_name):
     logger.info(f"Data written to {cspf_va_filename} at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
 
-
-
-
 def iterate_pagination(driver, output_directory, pdb_name: str, pocket_limit =1):
     if pocket_limit > 10:
         raise ValueError(f"Pocket limit cannot be greater than 10, however requested pocket_limit was set to {pocket_limit}")
@@ -309,38 +305,27 @@ def iterate_pagination(driver, output_directory, pdb_name: str, pocket_limit =1)
 
 def run_castpfold(pdb_file, config: SectionProxy):
     logger.info("Starting CASTpFold script...  at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-    # Load config
-    # config = load_config()
+
     chrome_driver_path = config['chrome_driver_path']
     base_url = config['base_url']
-    #job_number = config['job_number']
     output_directory = config['output_dir']
-    #config['out_dir']  + '_' + job_number
     pocket_limit = int(config['pocket_limit'])
     # To be requested from the input directory using pdb_name
     logger.info(f"CASTpFold request for a file: {pdb_file}")
     input_dir = config['input_dir']
+    headless = config['chrome_headless_mode']
+
     if not FileNamer.verify_pdb_exists(input_dir, pdb_file):
         raise Exception(f"File {pdb_file} does not exist in the {input_dir}")
     job_number = submit_castpfold_request(os.path.join(input_dir, pdb_file))
     pdb_name = os.path.splitext(pdb_file)[0]
     logger.info(f"CASTpFold script initialized from config, pocket_limit: {pocket_limit}")
 
-    # Set up Chrome options to automatically download files
-    chrome_options = Options()
     script_dir = os.path.dirname(os.path.abspath(__file__))
     download_dir = os.path.join(script_dir, "output")
-    prefs = {
-        "download.default_directory": download_dir,
-        "download.prompt_for_download": False,
-        "download.directory_upgrade": True,
-        "safebrowsing.enabled": False
-    }
-    chrome_options.add_experimental_option("prefs", prefs)
 
-    # Set up the WebDriver with the specified path
-    service = Service(chrome_driver_path)
-    driver = webdriver.Chrome(service=service, options=chrome_options)
+    use_headless_mode = str_to_bool(headless)
+    driver = create_chrome_driver(chrome_driver_path, download_dir, use_headless_mode)
 
     try:
         # Open the specified URL
@@ -360,6 +345,9 @@ def run_castpfold(pdb_file, config: SectionProxy):
         time.sleep(1)
     except BaseException as e:
         logger.error(f"Error while running casfpfold  on {pdb_file} at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}: ", e)
+        timestamp = time.strftime("%Y%m%d_%H%M%S")
+        screenshot_path = f"err_cspf_{timestamp}.png"
+        driver.save_screenshot(screenshot_path)
     finally:
         logger.info(f"castpfold finally, going to quit driver at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
         driver.quit()
