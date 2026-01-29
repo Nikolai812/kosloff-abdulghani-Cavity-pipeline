@@ -1,13 +1,14 @@
 from enum import Enum
 from datetime import datetime
 import os
+
 import pandas as pd
 from pandas import ExcelFile
 from pathlib import Path
 import logging
 import stat
 
-
+from keyboard_input_handler import handle_pm_input_folders
 from pymol_scripts_exception import PymolScriptsException
 from cavities_usage import CavitiesUsage
 from score_handler import ScoreHandler
@@ -158,7 +159,10 @@ class ConsensusBuilder:
         required_keys = ["cspf", "cvpl", "p2rk", "pupp"]
         results = {k: (-1,[]) for k in required_keys}
         files_found = {k: '' for k in required_keys}
-        # find 4 required files, hidden excluded
+
+        # Searching for non-expected files - not containing cspf,svpl,p2rk or pupp
+        # (just warning will be written if found),
+        # hidden excluded from the check, not starting from subdir name also excluded from the check
         for fname in os.listdir(sub_path):
             fpath = os.path.join(sub_path, fname)
             if not fname.lower().endswith(".xlsx"):
@@ -182,6 +186,7 @@ class ConsensusBuilder:
 
             if not found and not "consensus" in lower:
                 logger.warning(f"file {fname} does not match any prediction key: {key}, and even is not consensus file, looks like something wrong in {sub_path}")
+        # Check completed
 
         # process each of the 4 files
         for key, fpath in files_found.items():
@@ -291,7 +296,7 @@ class ConsensusBuilder:
         logger.info(f"Consensus file saved: {out_path} at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
     @classmethod
-    def process_multi_or_folder(cls, sel_output_dir, pm_input_dir, best_cavity_strategy, use_cavities_dict=None)->None:
+    def process_multi_or_folder(cls, sel_output_dir, pm_input_dir, best_cavity_strategy, use_cavities_dict=None, interactive_node=False)->None:
         """
         Scans 1st-level subdirectories of the Selenium Output: sel_output_dir (except containing 'temp' and 'OLD'), extracts best cavities ids,
         Then constructs a consensus file according to the chosen strategy and writes it to pm_input_dir.
@@ -305,36 +310,15 @@ class ConsensusBuilder:
         # Creating an empty dictionary for each OR (.pdb file) to keep residue scores
         pdb_aa_scores: dict[str, list[tuple[str, int, float]]] = {}
 
-        # Before iterate
-        subdir_names_to_iterate = []
-        if use_cavities_dict is not None:
-            # 1. Verify that for all keys from yaml (except "REST") correspond to existing OR_subfolders. Otherwise -exception
-            pm_input_subdirs = os.listdir(pm_input_dir)
-            non_rest_yaml_keys = [key for item in use_cavities_dict for key in item.keys() if key != "REST"] #[item.keys()[0] for item in yaml_dict]
-            missing_keys = [key for key in non_rest_yaml_keys if key not in pm_input_subdirs]
-            if missing_keys:
-                raise ValueError(f"The following yaml keys : {missing_keys} do not correspond to any {pm_input_dir} subdirectory {pm_input_subdirs}")
+        # Before iterate: select OR_NAMES (OR subdirectories) to process from PM_INPUT
+        pm_input_subdirs = os.listdir(pm_input_dir)
 
-
-            # 2. Verify whether -REST: "0" is present. If yes,  all non_key directories should be skipped (continue)
-            if CavitiesUsage.has_rest_zero(use_cavities_dict):
-                subdir_names_to_iterate = non_rest_yaml_keys
-                logger.info(f"Rest '0' found, the following subdirs are to be processed : {subdir_names_to_iterate}")
-            # 3. Run over all subdirs. If subdir key is present - apply cavity mask, else is REST is present - apply rest mask, else- apply default strategy
-            else:
-                subdir_names_to_iterate = os.listdir(pm_input_dir)
-                logger.info(f"All subdirs from {pm_input_dir} are to be processed : {subdir_names_to_iterate}")
-
+        # Switching between interactive user mode
+        skip_keyboard_input = not interactive_node
+        subdir_names_to_iterate, final_cavities_dict = handle_pm_input_folders(pm_input_dir, pm_input_subdirs, use_cavities_dict, skip_keyboard_input)
 
         # iterate over first-level subdirectories
         for sub in subdir_names_to_iterate:
-
-            # sub_path = os.path.join(sel_output_dir, sub)
-            # if not os.path.isdir(sub_path):
-            #     continue
-            # # skipping prankweb_temp and OLD_DATA folders
-            # if  'temp' in sub or 'OLD' in sub:
-            #     continue
 
             sub_path = Path(pm_input_dir) / sub
             if not sub_path.is_dir():
@@ -361,7 +345,7 @@ class ConsensusBuilder:
 
 
             ScoreHandler.collect_subdir_plddt(sub, pm_input_dir, pdb_aa_scores)
-            best_cavity_ids = ConsensusBuilder.extract_seq_id_for_proper_cavity(sub_path, strategy, use_cavities_dict)
+            best_cavity_ids = ConsensusBuilder.extract_seq_id_for_proper_cavity(sub_path, strategy, final_cavities_dict) # use_cavities_dict - previous version
             ConsensusBuilder.write_consensus_file(sub, best_cavity_ids, pdb_aa_scores, pm_input_dir)
             print("")
 

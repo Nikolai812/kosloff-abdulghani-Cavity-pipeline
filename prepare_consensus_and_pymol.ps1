@@ -24,7 +24,9 @@ cd $pymol_scripts
 
 Write-Host  "Starting pm_main.py script"
 
-python .\pm_main.py
+python .\pm_main.py  --interactive
+# If you want to skip user input, (configure everything in yaml of by default)
+# python .\pm_main.py
 
 cd  $base_dir
 
