@@ -5,12 +5,18 @@ from cavities_usage import CavitiesUsage
 
 logger = logging.getLogger(__name__)
 
+
 def green_prompt(prompt: str) -> None:
     logger.info(prompt, extra={'color': '\033[32m'})
     pass
 
+
 from typing import Any
-def handle_pm_input_folders(pm_input_dir, pm_input_subfolders: list[str | list[bytes]], use_cavities_dict, skip_keyboard_input=False) -> list[str | list[bytes]] | Any:
+
+
+def handle_pm_input_folders(pm_input_dir, pm_input_subfolders: list[str | list[bytes]], use_cavities_dict,
+                            skip_keyboard_input=False) -> tuple[list[str | list[bytes]], list[dict[str, str]]] | Any: #list[str | list[bytes]] | Any:
+
     # OPTION TO SKIP INTERACTIVE KEYBORD CAVITY SETTING (for example- for main post af2 pipeline stream)
     if skip_keyboard_input:
         subdir_names_to_iterate = get_from_yaml_dict(pm_input_dir, pm_input_subfolders, use_cavities_dict)
@@ -32,7 +38,8 @@ def handle_pm_input_folders(pm_input_dir, pm_input_subfolders: list[str | list[b
         user_exit()
 
     elif scenario_choice.strip().lower() == 'm':
-        subdir_names_to_iterate, updated_cavities_dict = set_cavities_manually(pm_input_dir, pm_input_subfolders, use_cavities_dict)
+        subdir_names_to_iterate, updated_cavities_dict = set_cavities_manually(pm_input_dir, pm_input_subfolders,
+                                                                               use_cavities_dict)
         return subdir_names_to_iterate, updated_cavities_dict
 
     elif scenario_choice.strip().lower() == 'f':
@@ -87,7 +94,6 @@ def set_cavities_manually(
         pm_input_subfolders: list[str],
         use_cavities_dict
 ) -> tuple[list[str], list[dict[str, str]]]:
-
     print("\nChoose OR_name to select:")
 
     # # Build index → OR_NAME mapping
@@ -100,7 +106,6 @@ def set_cavities_manually(
         for i, orname
         in enumerate(pm_input_subfolders, start=1)
     }
-
 
     # Results
     manually_set_or_names: list[str] = []

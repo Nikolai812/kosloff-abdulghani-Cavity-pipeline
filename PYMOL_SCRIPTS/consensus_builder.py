@@ -147,14 +147,7 @@ class ConsensusBuilder:
             if None == mask_to_apply and not ConsensusBuilder.has_rest_zero(use_cavities_dict):
                 mask_to_apply = CavitiesUsage.get_value_for_key(yaml_dict=use_cavities_dict, target_key="REST")
                 pass
-
-
-            if None == mask_to_apply:
-                logger.info (f"or_name {sub} has no explicit mask, default strategy will be applied")
-            else:
-                logger.info(f"for or_name {sub} using mask_to_apply {mask_to_apply}")
-
-
+        #ENDIF ENDIF
 
         required_keys = ["cspf", "cvpl", "p2rk", "pupp"]
         results = {k: (-1,[]) for k in required_keys}
@@ -187,6 +180,12 @@ class ConsensusBuilder:
             if not found and not "consensus" in lower:
                 logger.warning(f"file {fname} does not match any prediction key: {key}, and even is not consensus file, looks like something wrong in {sub_path}")
         # Check completed
+
+        # INFO about strategy or explicit mask choice
+        if None == mask_to_apply:
+            logger.info(f"\n!!!!or_name {sub} has no explicit mask, default strategy will be applied!!!")
+        else:
+            logger.info(f"\n+++++++++for or_name {sub} using mask_to_apply {mask_to_apply}+++++++")
 
         # process each of the 4 files
         for key, fpath in files_found.items():
@@ -296,7 +295,7 @@ class ConsensusBuilder:
         logger.info(f"Consensus file saved: {out_path} at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
     @classmethod
-    def process_multi_or_folder(cls, sel_output_dir, pm_input_dir, best_cavity_strategy, use_cavities_dict=None, interactive_node=False)->None:
+    def process_multi_or_folder(cls, pm_input_dir, best_cavity_strategy, use_cavities_dict=None, interactive_node=False)->list[dict[str, str]]:
         """
         Scans 1st-level subdirectories of the Selenium Output: sel_output_dir (except containing 'temp' and 'OLD'), extracts best cavities ids,
         Then constructs a consensus file according to the chosen strategy and writes it to pm_input_dir.
@@ -304,18 +303,18 @@ class ConsensusBuilder:
         Nevertheless the scores from pdb files are being read (sourced) from the pm_input_dir
         """
 
-        # There might be several strategies to choose the best cavity (from the first 5 in 4 preriction methods)
-        strategy=StrategyName(best_cavity_strategy)
-
-        # Creating an empty dictionary for each OR (.pdb file) to keep residue scores
-        pdb_aa_scores: dict[str, list[tuple[str, int, float]]] = {}
-
         # Before iterate: select OR_NAMES (OR subdirectories) to process from PM_INPUT
         pm_input_subdirs = os.listdir(pm_input_dir)
 
         # Switching between interactive user mode
         skip_keyboard_input = not interactive_node
         subdir_names_to_iterate, final_cavities_dict = handle_pm_input_folders(pm_input_dir, pm_input_subdirs, use_cavities_dict, skip_keyboard_input)
+
+        # There might be several strategies to choose the best cavity (from the first 5 in 4 preriction methods)
+        strategy = StrategyName(best_cavity_strategy)
+
+        # Creating an empty dictionary for each OR (.pdb file) to keep residue scores
+        pdb_aa_scores: dict[str, list[tuple[str, int, float]]] = {}
 
         # iterate over first-level subdirectories
         for sub in subdir_names_to_iterate:
@@ -348,6 +347,8 @@ class ConsensusBuilder:
             best_cavity_ids = ConsensusBuilder.extract_seq_id_for_proper_cavity(sub_path, strategy, final_cavities_dict) # use_cavities_dict - previous version
             ConsensusBuilder.write_consensus_file(sub, best_cavity_ids, pdb_aa_scores, pm_input_dir)
             print("")
-
+        # END for cycle
+        return final_cavities_dict
+    # END of process_multi_or_folder
 
 

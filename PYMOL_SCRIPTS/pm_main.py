@@ -84,7 +84,7 @@ def main():
     config = read_config()
     pm_input_dir=config['pm_input_dir']
     pm_output_dir=config['pm_output_dir']
-    selenium_output_dir=config['selenium_output_dir']
+    # selenium_output_dir=config['selenium_output_dir']
     best_cavity_strategy=config['best_cavity_strategy']
     use_cavities_file=config['use_cavities']
 
@@ -105,13 +105,17 @@ def main():
         CavitiesUsage.verify(use_cavities_dict)
         print(use_cavities_dict)
 
-        ConsensusBuilder.process_multi_or_folder(selenium_output_dir, pm_input_dir, best_cavity_strategy, use_cavities_dict, args.interactive)
+        final_cavities_dict = ConsensusBuilder.process_multi_or_folder(pm_input_dir,
+                                                                    best_cavity_strategy,
+                                                                    use_cavities_dict,
+                                                                    args.interactive)
+
         logger.info(f"Successfully processed {pm_input_dir},  at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
         # 2. Preparing coloring scripts for PyMol
         logger.info(f"Starting task: PyMol script preparation for {pm_input_dir}.")
         # looks to be called for all, even is REST: 0
-        prepare_for_pymol(pm_input_dir, pm_output_dir, use_cavities_dict, copy_input=True)
+        prepare_for_pymol(pm_input_dir, pm_output_dir, final_cavities_dict, copy_input=True)
         logger.info(
             f"Completed task:  PyMol script preparation to {pm_output_dir}, exiting at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
             extra={'color': '\033[32m'})

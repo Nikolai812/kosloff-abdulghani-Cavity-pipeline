@@ -166,10 +166,10 @@ def prepare_for_pymol(input_directory, output_directory, use_cavities_dict, copy
     os.makedirs(output_directory, exist_ok=True)
 
     subdir_names_to_iterate = []
-    if use_cavities_dict is not None:
+    if True: # use_cavities_dict is not None:
 
         # Verify whether -REST: "0" is present. If yes,  all non_key directories should be skipped (continue)
-        if CavitiesUsage.has_rest_zero(use_cavities_dict):
+        if (use_cavities_dict is not None) and (CavitiesUsage.has_rest_zero(use_cavities_dict)):
             non_rest_yaml_keys = [key for item in use_cavities_dict for key in item.keys() if key != "REST"]
             subdir_names_to_iterate = non_rest_yaml_keys
             logger.info(f"prepare_for_pymol: REST: '0' found, the following subdirs are to be used for pymol scripts renewing: {subdir_names_to_iterate}")
