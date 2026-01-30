@@ -178,7 +178,7 @@ def set_cavities_manually(
 
         # ---- ask whether to continue ----
         next_choice = input(
-            "\nWould you like to set cavities for next OR_name? (y/yes/1 to continue): "
+            "\nWould you like to set cavities for next OR_name?\n(y/yes/1 to select next OR, all the rest keys to proceed with already selected): "
         ).strip().lower()
 
         if next_choice not in {"y", "yes", '1'}:
