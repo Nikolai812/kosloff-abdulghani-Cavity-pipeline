@@ -1,10 +1,10 @@
 import configparser
+from datetime import datetime
 import logging
 import os
 from UI_SELENIUM.file_namer import MethodType
 
 import shutil
-
 
 # Set a logger for this very script
 logger = logging.getLogger(__name__)
@@ -130,10 +130,16 @@ def verify_and_copy(
 def main() -> None:
 
     # Setting logger and color logging fot console
+    timestamp = datetime.now().strftime("%y%m%d_%H%M")
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    print("data_to_pm_inputls.py dir: ", script_dir)
+    log_dir = f"{script_dir}/logs"
+    os.makedirs(log_dir, exist_ok=True)
+
     handler = logging.StreamHandler()
     handler.setFormatter(ColorFormatter())
 
-    file_handler = logging.FileHandler("log_data_to_pm.log")
+    file_handler = logging.FileHandler(f"{log_dir}/log_data_to_pm_{timestamp}.log")
     file_handler.setFormatter(
         logging.Formatter("%(asctime)s %(levelname)s: %(message)s")
     )

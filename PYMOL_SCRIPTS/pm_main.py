@@ -1,5 +1,6 @@
 import argparse
 import configparser
+import os
 from datetime import datetime
 import logging
 
@@ -54,10 +55,17 @@ def read_config():
 
 def main():
     # Setting logger and color logging fot console
+    timestamp = datetime.now().strftime("%y%m%d_%H%M")
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    print("pm_main.py dir: ", script_dir)
+    log_dir = f"{script_dir}/../logs"
+    os.makedirs(log_dir, exist_ok=True)
+
     handler = logging.StreamHandler() # sys.stderr
     handler.setFormatter(ColorFormatter())
 
-    file_handler = logging.FileHandler("log_data_to_pm.log")
+    file_handler = logging.FileHandler(f"{log_dir}/pm_main_{timestamp}.log")
+                                       #"log_data_to_pm.log")
     file_handler.setFormatter(
         logging.Formatter("%(asctime)s %(levelname)s: %(message)s")
     )

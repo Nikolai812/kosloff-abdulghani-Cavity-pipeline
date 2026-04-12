@@ -1,11 +1,16 @@
 #!/bin/bash
 
 # Save the current working directory
-logfile="ui_selenium.log"
+log_dir="logs"
+mkdir -p "$log_dir"
+timestamp=$(date +"%y%m%d_%H%M")
+
+logfile="$(pwd)/${log_dir}/run_pacapp_bash_${timestamp}.log"
+
 echo "Started run_pacupp.bash script at $(date '+%Y-%m-%d %H:%M:%S')" | tee -a "$logfile"
 start_dir=$(pwd)
+
 echo "Start directory: $start_dir" | tee -a "$logfile"
-logfile="$(pwd)/ui_selenium.log"
 echo "Logfile defined as $logfile" | tee -a "$logfile"
 
 #CONFIGURATION: Pacupp script and output directories
