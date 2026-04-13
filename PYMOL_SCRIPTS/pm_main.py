@@ -47,7 +47,7 @@ def read_config():
     return {
         'pm_output_dir': config['visualization']['pm_output_dir'],
         'pm_input_dir': config['visualization']['pm_input_dir'],
-        'selenium_output_dir': config['visualization']['selenium_output_dir'],
+        'data_lake_dir': config['visualization']['data_lake_dir'],
         'best_cavity_strategy': config['visualization']['best_cavity_strategy'],
         'use_cavities': config['visualization']['use_cavities'],
     }
@@ -90,8 +90,21 @@ def main():
     # Set a specific logger for the project
     logger = logging.getLogger(__name__)
     config = read_config()
+    config['script_dir'] = script_dir
+    data_lake_dir = os.path.join(script_dir, config['data_lake_dir'])
+    print("data_lake_dir: ", config['data_lake_dir'])
+    if not os.path.exists(data_lake_dir):
+        raise FileNotFoundError(f"Data lake '{data_lake_dir}' does not exist, please reconfigure the pipeline")
+    else:
+        config['data_lake_dir'] = data_lake_dir
+        print(f"Using Data Lake: {data_lake_dir}")
+
+    config['pm_input_dir'] = os.path.join(data_lake_dir, config['pm_input_dir'])
+    config['pm_output_dir'] = os.path.join(data_lake_dir, config['pm_output_dir'])
+
     pm_input_dir=config['pm_input_dir']
     pm_output_dir=config['pm_output_dir']
+
     # selenium_output_dir=config['selenium_output_dir']
     best_cavity_strategy=config['best_cavity_strategy']
     use_cavities_file=config['use_cavities']

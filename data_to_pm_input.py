@@ -1,3 +1,4 @@
+import argparse
 import configparser
 from datetime import datetime
 import logging
@@ -35,7 +36,8 @@ class ColorFormatter(logging.Formatter):
 def verify_and_copy(
     selenium_input_dir: str,
     selenium_output_dir: str,
-    pymol_input_dir: str
+    pymol_input_dir: str,
+    clean_before_copy: bool = False
 ) -> None:
     """
     Verify XLSX outputs per OR_NAME (case-insensitive) and copy
@@ -54,6 +56,18 @@ def verify_and_copy(
             raise NotADirectoryError(f"{label} does not exist or is not a directory: {path}")
 
     os.makedirs(pymol_input_dir, exist_ok=True)
+
+    # ------------------------------------------------------------------
+    # Optional cleanup
+    # ------------------------------------------------------------------
+    if clean_before_copy:
+        logger.info(f"Cleaning directory before copy: {pymol_input_dir}")
+        for entry in os.listdir(pymol_input_dir):
+            entry_path = os.path.join(pymol_input_dir, entry)
+            if os.path.isdir(entry_path):
+                shutil.rmtree(entry_path)
+            else:
+                os.remove(entry_path)
 
     # ------------------------------------------------------------------
     # 1. Collect OR_NAME directories (1st level, excluding OLD_DATA)
@@ -132,7 +146,7 @@ def main() -> None:
     # Setting logger and color logging fot console
     timestamp = datetime.now().strftime("%y%m%d_%H%M")
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    print("data_to_pm_inputls.py dir: ", script_dir)
+    print("data_to_pm_input.py dir: ", script_dir)
     log_dir = f"{script_dir}/logs"
     os.makedirs(log_dir, exist_ok=True)
 
@@ -162,15 +176,33 @@ def main() -> None:
     pymoll_config_path = os.path.join(script_dir, "PYMOL_SCRIPTS/pm_config.ini")
     pymoll_config.read(pymoll_config_path, encoding="utf-8")
 
-    selenium_input_dir = os.path.join(script_dir,"UI_SELENIUM", selenium_config['DEFAULT']['input_dir'])
-    selenium_output_dir = os.path.join(script_dir, "UI_SELENIUM",selenium_config['DEFAULT']['output_dir'])
-    pymol_input_dir = os.path.join(script_dir, "PYMOL_SCRIPTS", pymoll_config['visualization']['pm_input_dir'])
+    data_lake_dir = os.path.join("UI_SELENIUM", selenium_config['DEFAULT']['data_lake_dir'])
+    data_lake_dir2 = os.path.join("PYMOL_SCRIPTS", pymoll_config['visualization']['data_lake_dir'])
+
+    selenium_input_dir = os.path.join(data_lake_dir, selenium_config['DEFAULT']['input_dir'])
+    selenium_output_dir = os.path.join(data_lake_dir, selenium_config['DEFAULT']['output_dir'])
+
+    pymol_input_dir = os.path.join(data_lake_dir2, pymoll_config['visualization']['pm_input_dir'])
 
     logger.info("\n\n===============================================================================================")
     logger.info(f"Starting verification and copying: \n {selenium_input_dir}, {selenium_output_dir} -> {pymol_input_dir} completed")
     logger.info("===============================================================================================\n\n")
 
-    verify_and_copy(selenium_input_dir, selenium_output_dir, pymol_input_dir)
+    parser = argparse.ArgumentParser(
+        description="Prepare PyMOL input data from Selenium pipeline output"
+    )
+
+    parser.add_argument(
+        "-c", "--clean-before-copy",
+        action="store_true",
+        help="Clean pymol_input_dir before copying"
+    )
+
+    args = parser.parse_args()
+    clean_before = args.clean_before_copy
+
+    verify_and_copy(selenium_input_dir, selenium_output_dir, pymol_input_dir,
+                    clean_before_copy=clean_before)
     logger.info("===============================================================================================")
     logger.info(f"Verify and copy from {selenium_input_dir}, {selenium_output_dir} -> {pymol_input_dir} completed")
     logger.info("===============================================================================================")

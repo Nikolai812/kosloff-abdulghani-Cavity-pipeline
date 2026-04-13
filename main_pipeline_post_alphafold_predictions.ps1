@@ -27,58 +27,8 @@ if ($LASTEXITCODE -ne 0) {
 Write-Output "4 cavity predictions completed"
 
 
-# Define directories
-Write-Output ""
-Write-Output ""
-Write-Output "Moving to consensus and PyMol preparation"
-$predictions_input = Join-Path $base_dir "UI_SELENIUM\input"
-$predictions_output = Join-Path $base_dir "UI_SELENIUM\output"
-$pm_input           = Join-Path $base_dir "PYMOL_SCRIPTS\PM_INPUT"
-
-Write-Output "Defined predictions input dir $predictions_input"
-Write-Output "Defined predictions output dir $predictions_output"
-Write-Output "Defined pymol preparations input dir $pm_input"
-
-# Check if the PM_INPUT directory exists
-if (Test-Path $pm_input) {
-    # Check if the directory is not empty
-    if ((Get-ChildItem -Path $pm_input -Recurse -Force).Count -gt 0) {
-        # Different approach than in prepare_consensus_and_pymol.ps1:
-        Write-Warning "Directory '$pm_input' exists and is not empty. Main pipeline:  clearing all files from '$pm_input'"
-        # Delete all files in the directory
-        Get-ChildItem -Path $pm_input -Recurse -Force | Remove-Item -Force -Recurse
-    } else {
-        Write-Host "Directory '$pm_input' exists and is empty. No action taken."
-    }
-}
-
-Write-Host "Copying from:"
-Write-Host "  $predictions_output"
-Write-Host "To:"
-Write-Host "  $pm_input"
-
-robocopy $predictions_output $pm_input /E /XD *OLD* *temp* /R:0 /W:0
-
-
-# Get all .pdb files in the predictions input directory
-Get-ChildItem -Path $predictions_input -Filter "*.pdb" -File | ForEach-Object {
-    # Get the file name without extension
-    $fileNameOnly = $_.BaseName
-
-    # Create destination subdirectory under $pm_input
-    $destDir = Join-Path $pm_input $fileNameOnly
-    New-Item -ItemType Directory -Path $destDir -Force | Out-Null
-
-    # Copy the .pdb file into its corresponding subdirectory
-    Copy-Item -Path $_.FullName -Destination $destDir -Force
-
-    Write-Host "Copied $($_.Name) → $destDir"
-}
-
-
-#defining the 4 predictions output directory and
-
-Write-Output "Copying 4 predictions output to pymol input dir"
+# Copy UI_SELENIUM output to PYMOL_SCRIPTS input (with clean before copy)
+python data_to_pm_input.py -c
 
 
 # Write-Output "Starting consensus building and pymol scripts preparation"

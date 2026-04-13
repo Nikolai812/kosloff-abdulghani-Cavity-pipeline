@@ -112,6 +112,9 @@ def main(rerun_prediction: str = None) -> None:
     logging.info(f"DEFAULT config: {config.items()}")
     input_dir = config['input_dir']
     pdb_files = get_pdb_files(input_dir)
+    if(len(pdb_files) <1 ):
+        logger.warning(f"!!!!!!!!!!!!!!!!!!!!!!!!!!")
+        logger.warning(f"No input .pdb files found in {input_dir} \n no new cavity residues files for any method are expected")
 
     if rerun_prediction is None:
         run_4_predictions(pdb_files, config)
