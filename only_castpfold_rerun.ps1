@@ -16,6 +16,10 @@ Write-Host "Starting rerun only Cast-p-Fold plus predictions from directory: $st
 $base_dir = $start_dir
 
 python .\UI_SELENIUM\main.py --rerun-prediction=cspf
-Write-Output "only castfold plus .ps1 script completed"
+if ($LASTEXITCODE -ne 0) {
+    Write-Output "Castpfold predictions: fatal error unhandled, terminating further execution"
+    exit 1
+}
+Write-Output "only castpfold plus .ps1 script completed"
 
 

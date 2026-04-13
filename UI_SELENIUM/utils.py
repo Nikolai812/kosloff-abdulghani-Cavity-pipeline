@@ -14,8 +14,16 @@ def load_config():
 
     # Updating all relative paths from config to get the absolute values starting from the location of tha main.py file
     config['DEFAULT']['script_dir'] = script_dir
-    config['DEFAULT']['input_dir'] = os.path.join(script_dir, config['DEFAULT']['input_dir'])
-    config['DEFAULT']['output_dir'] = os.path.join(script_dir, config['DEFAULT']['output_dir'])
+    data_lake_dir = os.path.join(script_dir, config['DEFAULT']['data_lake_dir'])
+    print("data_lake_dir: ", config['DEFAULT']['data_lake_dir'])
+    if not os.path.exists(data_lake_dir):
+        raise FileNotFoundError(f"Data lake '{data_lake_dir}' does not exist, please reconfigure the pipeline")
+    else:
+        config['DEFAULT']['data_lake_dir'] = data_lake_dir
+        print(f"Using Data Lake: {data_lake_dir}")
+
+    config['DEFAULT']['input_dir'] = os.path.join(data_lake_dir, config['DEFAULT']['input_dir'])
+    config['DEFAULT']['output_dir'] = os.path.join(data_lake_dir, config['DEFAULT']['output_dir'])
     config['DEFAULT']['pacupp_python_feedup'] = os.path.join(script_dir, config['DEFAULT']['pacupp_python_feedup'])
     config['DEFAULT']['prankweb_temp'] = os.path.join(script_dir, config['DEFAULT']['prankweb_temp'])
     # End of relative path update

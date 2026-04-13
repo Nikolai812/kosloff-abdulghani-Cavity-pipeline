@@ -21,8 +21,13 @@ pacupp_spreadsheet_lists_dir="$pacupp_dir/output-files/spreadsheet-ready-lining-
 # (Normal place- inside the uh-cast-p-fold project.)
 # pipeline_base="/mnt/c/Users/user/source/repos/uh-cast-p-fold"
 pipeline_base=$start_dir
-input_dir="$pipeline_base/UI_SELENIUM/input"
 pacupp_python_feedup="$pipeline_base/UI_SELENIUM/pacupp_python_feedup"
+# Former configuration with inputs and outputs inside the pipeline base directory
+# input_dir="$pipeline_base/UI_SELENIUM/input"
+# Modern configuration with external data lake
+input_dir="$pipeline_base/../kosloff-abdulghani-cavity-pipeline-data/input"
+
+
 # (input_dir="/mnt/c/Users/user/Ubuntu/INPUT_PDB")
 
 echo "!!!!!!!!!!! DIRECTORY CONFIGURATION:" | tee -a "$logfile"
@@ -44,12 +49,16 @@ rm "$pacupp_python_feedup"/*
 echo "Listing .pdb files in $input_dir:" | tee -a "$logfile"
 ls "$input_dir"/*.pdb 2>/dev/null || echo "No .pdb files found in $input_dir at $(date '+%Y-%m-%d %H:%M:%S')" | tee -a "$logfile"
 
-# Gather all .pdb files into an array
+# Gather all .pdb files into an array (Enable nullglob so unmatched patterns expand to nothing),
+shopt -s nullglob
 pdb_input_files=("$input_dir"/*.pdb)
+
+echo " "
 
 # Check if any .pdb files were found
 if [ ${#pdb_input_files[@]} -eq 0 ]; then
-    echo "No .pdb files found in $input_dir" | tee -a "$logfile"
+    echo "No .pdb files found in $input_dir, exiting" | tee -a "$logfile"
+    echo "!!!!+++ EXITING, NO PDB FILES ++++!!!!!!!!!!!" | tee -a "$logfile"
     exit 1
 fi
 

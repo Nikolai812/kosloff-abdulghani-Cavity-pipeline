@@ -16,6 +16,10 @@ Write-Host "Starting rerun only Prank Web predictions from directory: $start_dir
 $base_dir = $start_dir
 
 python .\UI_SELENIUM\main.py --rerun-prediction=p2rk
+if ($LASTEXITCODE -ne 0) {
+    Write-Output "Python Prank Web predictions: fatal error unhandled, terminating further execution"
+    exit 1
+}
 Write-Output "only Prank Web .ps1 script completed"
 
 

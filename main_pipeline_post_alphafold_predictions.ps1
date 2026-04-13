@@ -20,6 +20,10 @@ wsl -d Ubuntu --exec /bin/bash -c "./run_pacupp.bash"
 
 Write-Output "Pacupp over JMOL completed. Starting python 4 predictions processing"
 python .\UI_SELENIUM\main.py
+if ($LASTEXITCODE -ne 0) {
+    Write-Output "Python 4-predictions: fatal error unhandled, terminating further execution"
+    exit 1
+}
 Write-Output "4 cavity predictions completed"
 
 

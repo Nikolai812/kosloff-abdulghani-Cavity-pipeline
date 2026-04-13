@@ -16,6 +16,10 @@ Write-Host "Starting rerun only cavity plus predictions from directory: $start_d
 $base_dir = $start_dir
 
 python .\UI_SELENIUM\main.py --rerun-prediction=cvpl
+if ($LASTEXITCODE -ne 0) {
+    Write-Output "Cavityplus redictions: fatal error unhandled, terminating further execution"
+    exit 1
+}
 Write-Output "only cavity plus .ps1 script completed"
 
 

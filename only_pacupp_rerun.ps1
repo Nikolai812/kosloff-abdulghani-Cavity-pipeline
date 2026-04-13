@@ -18,8 +18,17 @@ Write-Output "Starting pacupp script for JMOL"
 
 wsl -d Ubuntu --exec /bin/bash -c "./run_pacupp.bash"
 
+if ($LASTEXITCODE -ne 0) {
+    Write-Output "run_pacupp.bash exited with error: terminating further execution"
+    exit 1
+}
+
 Write-Output "Pacupp over JMOL completed. Starting post JMOL output handling and creating Excel files"
 python .\UI_SELENIUM\main.py --rerun-prediction=pupp
+if ($LASTEXITCODE -ne 0) {
+    Write-Output "Python pacupp predictions: fatal error unhandled, terminating further execution"
+    exit 1
+}
 Write-Output "only pacupp .ps1 script completed"
 
 
