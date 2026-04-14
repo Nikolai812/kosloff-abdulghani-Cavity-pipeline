@@ -87,6 +87,14 @@ def main():
         help="Run in interactive mode"
     )
 
+    parser.add_argument(
+        "-m", "--consensus-method",
+        type=int,
+        choices=[1, 2],
+        default=1,
+        help="Number of consensus methods to use, default is 1"
+    )
+
     # Set a specific logger for the project
     logger = logging.getLogger(__name__)
     config = read_config()
@@ -115,6 +123,11 @@ def main():
     else:
         logger.info("Non-interactive mode, no prompt for user input")
 
+    if args.consensus_method == 2:
+        logger.warning(f"Consensus method {args.consensus_method}  was selected by user")
+    else:
+        logger.info(f"Consensus method: {args.consensus_method}  (as default)")
+
 
     try:
         # 1. Creating consensus file (in a pm_input dir for further script creation)
@@ -129,7 +142,8 @@ def main():
         final_cavities_dict = ConsensusBuilder.process_multi_or_folder(pm_input_dir,
                                                                     best_cavity_strategy,
                                                                     use_cavities_dict,
-                                                                    args.interactive)
+                                                                    args.interactive,
+                                                                    args.consensus_method)
 
         logger.info(f"Successfully processed {pm_input_dir},  at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 

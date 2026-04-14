@@ -8,6 +8,8 @@ from pathlib import Path
 import logging
 import stat
 
+from pandas.core.common import consensus_name_attr
+
 from keyboard_input_handler import handle_pm_input_folders
 from pymol_scripts_exception import PymolScriptsException
 from cavities_usage import CavitiesUsage
@@ -225,13 +227,29 @@ class ConsensusBuilder:
 
         return results
 
+    @classmethod
+    def consensus_function(cls, cspf: int, cvpl: int, p2rk: int, pupp: int,
+                           consensus_method: int) -> int:
+
+        if consensus_method == 1:
+            # default
+            return 1 if (cspf == 1 or p2rk == 1 or (cvpl == 1 and pupp == 1)) else 0
+        elif consensus_method == 2:
+            # exclude pupp, any other has 1
+            return 1 if  cspf + cvpl + p2rk >= 1 else 0
+
+        raise PymolScriptsException(f"Consensus Method {consensus_method} is incorrect, not implemented")
+
+
+
 
     @classmethod
     def write_consensus_file(cls,
                              sub: str,
                              best_cavity_ids: dict[str, tuple[int, list[int], list[str]]],
                              scores_map: dict[str, list[tuple[str, int, float]]],
-                             output_dir: str) -> None:
+                             output_dir: str,
+                             consensus_method: int) -> None:
         """
         Creates an Excel consensus file for the given subdirectory.
         Output file: {sub}_consensus.xlsx
@@ -266,8 +284,9 @@ class ConsensusBuilder:
             pupp = 1 if seq_tuple[0] in best_cavity_ids.get("pupp", (None, []))[1] else 0
 
             # Consensus rule:
-            # 1 if cspf=1 OR p2rk=1 OR (cvpl=1 AND pupp=1)
-            consensus = 1 if (cspf == 1 or p2rk == 1 or (cvpl == 1 and pupp == 1)) else 0
+            # chosen according to the method number (1,2 or 3)
+            consensus = ConsensusBuilder.consensus_function(cspf, cvpl, p2rk, pupp, consensus_method)
+            #1 if (cspf == 1 or p2rk == 1 or (cvpl == 1 and pupp == 1)) else 0
 
             row = {
                 "Seq ID": seq_tuple[0],
@@ -292,14 +311,20 @@ class ConsensusBuilder:
         out_path = os.path.join(sub_output_dir, f"{sub}_consensus.xlsx")
         df.to_excel(out_path, index=False)
 
+        logger.info(f"Consensus method used during preparation: {consensus_method}")
         logger.info(f"Consensus file saved: {out_path} at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
     @classmethod
-    def process_multi_or_folder(cls, pm_input_dir, best_cavity_strategy, use_cavities_dict=None, interactive_node=False)->list[dict[str, str]]:
+    def process_multi_or_folder(cls, pm_input_dir,
+                                best_cavity_strategy,
+                                use_cavities_dict=None,
+                                interactive_node=False,
+                                consensus_method_number = 1)->list[dict[str, str]]:
         """
         Scans 1st-level subdirectories of the Selenium Output: sel_output_dir (except containing 'temp' and 'OLD'), extracts best cavities ids,
-        Then constructs a consensus file according to the chosen strategy and writes it to pm_input_dir.
-        sel_output_dir works as an source (input) directory, pm_input_dir - as an output for consensus file
+        Then constructs a consensus file according to the chosen strategy and writes it to pm_input_dir
+        (there  are two possible consensus methods, by default is chosen 1)
+        sel_output_dir works as a source (input) directory, pm_input_dir - as an output for consensus file
         Nevertheless the scores from pdb files are being read (sourced) from the pm_input_dir
         """
 
@@ -346,7 +371,8 @@ class ConsensusBuilder:
             ScoreHandler.collect_subdir_plddt(sub, pm_input_dir, pdb_aa_scores)
             try:
                 best_cavity_ids = ConsensusBuilder.extract_seq_id_for_proper_cavity(sub_path, strategy, final_cavities_dict) # use_cavities_dict - previous version
-                ConsensusBuilder.write_consensus_file(sub, best_cavity_ids, pdb_aa_scores, pm_input_dir)
+                ConsensusBuilder.write_consensus_file(sub, best_cavity_ids, pdb_aa_scores, pm_input_dir,
+                                                      consensus_method=consensus_method_number)
                 print("")
             except PymolScriptsException as e:
                 logger.error(f"Exception while processing {sub_path}: {e}")
