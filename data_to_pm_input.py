@@ -3,9 +3,8 @@ import configparser
 from datetime import datetime
 import logging
 import os
-from UI_SELENIUM.file_namer import MethodType
-
 import shutil
+from UI_SELENIUM.file_namer import MethodType
 
 # Set a logger for this very script
 logger = logging.getLogger(__name__)
@@ -33,6 +32,8 @@ class ColorFormatter(logging.Formatter):
         return f"{color}{msg}{self.RESET}"
 # End of ColorFormatter class
 
+
+
 def verify_and_copy(
     selenium_input_dir: str,
     selenium_output_dir: str,
@@ -42,6 +43,11 @@ def verify_and_copy(
     """
     Verify XLSX outputs per OR_NAME (case-insensitive) and copy
     OR_NAME folders and PDB files into the PyMOL input directory.
+
+    Also writes a summary.txt file with:
+    - number of .pdb input files
+    - number of OR_NAME entries with missing XLSX methods
+    - detailed missing methods per OR_NAME
     """
 
     # ------------------------------------------------------------------
@@ -70,7 +76,14 @@ def verify_and_copy(
                 os.remove(entry_path)
 
     # ------------------------------------------------------------------
-    # 1. Collect OR_NAME directories (1st level, excluding OLD_DATA)
+    # Count .pdb input files
+    # ------------------------------------------------------------------
+    input_files = os.listdir(selenium_input_dir)
+    pdb_files = [f for f in input_files if f.lower().endswith(".pdb")]
+    X = len(pdb_files)
+
+    # ------------------------------------------------------------------
+    # 1. Collect OR_NAME directories
     # ------------------------------------------------------------------
     or_names = [
         name for name in os.listdir(selenium_output_dir)
@@ -81,6 +94,9 @@ def verify_and_copy(
     # ------------------------------------------------------------------
     # 2. Verify XLSX files per OR_NAME
     # ------------------------------------------------------------------
+    Z = 0
+    missing_dict = {}  # <-- NEW
+
     for or_name in or_names:
         or_dir = os.path.join(selenium_output_dir, or_name)
 
@@ -88,6 +104,8 @@ def verify_and_copy(
             f for f in os.listdir(or_dir)
             if f.lower().endswith(".xlsx")
         ]
+
+        missing_methods = []  # <-- collect per OR_NAME
 
         for method in MethodType:
             found = any(
@@ -97,48 +115,68 @@ def verify_and_copy(
             )
 
             if not found:
+                missing_methods.append(method.value)  # or method.name if preferred
                 logger.warning(
                     f"Missing XLSX file for OR_NAME='{or_name}', "
-                    f"MethodType='{method.name}',"
+                    f"MethodType='{method.name}', "
                     f"!!!!!!!! CONSENSUS file cannot be built for {or_name}!!!!"
                 )
 
+        if missing_methods:
+            Z += 1
+            missing_dict[or_name] = missing_methods  # <-- store result
+
     # ------------------------------------------------------------------
-    # 3. Copy OR_NAME directories (overwrite with warning)
+    # 3. Copy OR_NAME directories
     # ------------------------------------------------------------------
     for or_name in or_names:
         src_dir = os.path.join(selenium_output_dir, or_name)
         dst_dir = os.path.join(pymol_input_dir, or_name)
 
         if os.path.exists(dst_dir):
-            logger.info(
-                f"+++++ Directory already exists and will be overwritten: {dst_dir}"
-            )
+            logger.info(f"+++++ Directory already exists and will be overwritten: {dst_dir}")
             shutil.rmtree(dst_dir)
 
         shutil.copytree(src_dir, dst_dir)
 
     # ------------------------------------------------------------------
-    # 4. Copy {OR_NAME}.pdb from selenium_input_dir (case-insensitive)
+    # 4. Copy {OR_NAME}.pdb
     # ------------------------------------------------------------------
-    input_files = os.listdir(selenium_input_dir)
-
     for or_name in or_names:
         pdb_found = next(
-            (f for f in input_files
-             if f.lower() == f"{or_name.lower()}.pdb"),
+            (f for f in input_files if f.lower() == f"{or_name.lower()}.pdb"),
             None
         )
 
         if pdb_found is None:
             logger.warning(
-                f"!!!!!!! Missing PDB file for OR_NAME='{or_name}', PYMOL script won't work for it")
+                f"!!!!!!! Missing PDB file for OR_NAME='{or_name}', PYMOL script won't work for it"
+            )
             continue
 
         shutil.copy2(
             os.path.join(selenium_input_dir, pdb_found),
             os.path.join(pymol_input_dir, or_name, pdb_found)
         )
+
+    # ------------------------------------------------------------------
+    # 5. Write 4methods_summary.txt
+    # ------------------------------------------------------------------
+    timestamp = datetime.now().strftime("%H%M")
+    summary_path = os.path.join(pymol_input_dir, f"4methods_summary_{timestamp}.txt")
+
+    with open(summary_path, "w") as f:
+        f.write(f"The job included {X} .pdb files\n")
+        f.write(f"{Z} files have missing methods\n")
+
+        if missing_dict:
+            f.write("\nDetails:\n")
+            for or_name, methods in missing_dict.items():
+                methods_str = ", ".join(methods)
+                f.write(f"{or_name}: missing [{methods_str}]\n")
+
+    logger.info(f"Summary written to: {summary_path}")
+
 
 
 def main() -> None:
