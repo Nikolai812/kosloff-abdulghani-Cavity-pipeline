@@ -344,9 +344,13 @@ class ConsensusBuilder:
 
 
             ScoreHandler.collect_subdir_plddt(sub, pm_input_dir, pdb_aa_scores)
-            best_cavity_ids = ConsensusBuilder.extract_seq_id_for_proper_cavity(sub_path, strategy, final_cavities_dict) # use_cavities_dict - previous version
-            ConsensusBuilder.write_consensus_file(sub, best_cavity_ids, pdb_aa_scores, pm_input_dir)
-            print("")
+            try:
+                best_cavity_ids = ConsensusBuilder.extract_seq_id_for_proper_cavity(sub_path, strategy, final_cavities_dict) # use_cavities_dict - previous version
+                ConsensusBuilder.write_consensus_file(sub, best_cavity_ids, pdb_aa_scores, pm_input_dir)
+                print("")
+            except PymolScriptsException as e:
+                logger.error(f"Exception while processing {sub_path}: {e}")
+                logger.warning(f"Could not create consensus file for {sub}")
         # END for cycle
         return final_cavities_dict
     # END of process_multi_or_folder
