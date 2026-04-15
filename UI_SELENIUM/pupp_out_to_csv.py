@@ -53,7 +53,7 @@ def process_pupp_out_directory(input_dir, config: SectionProxy) -> None:
         polar_files = [f for f in filenames if "_POLAR_" in f]
         if len(apolar_files) != 5 or len(polar_files) != 5:
             print(f"Warning: {or_name} does not have 5 APOLAR and 5 POLAR files. Skipping.")
-            continue
+            ##### continue ?????
 
         #unique_entries = defaultdict(set)
 
