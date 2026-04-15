@@ -163,7 +163,9 @@ def verify_and_copy(
     # 5. Write 4methods_summary.txt
     # ------------------------------------------------------------------
     timestamp = datetime.now().strftime("%H%M")
-    summary_path = os.path.join(pymol_input_dir, f"4methods_summary_{timestamp}.txt")
+    parent_dir = os.path.dirname(pymol_input_dir)
+    summary_path = os.path.join(parent_dir, f"4methods_summary_{timestamp}.txt")
+
 
     with open(summary_path, "w") as f:
         f.write(f"The job included {X} .pdb files\n")
